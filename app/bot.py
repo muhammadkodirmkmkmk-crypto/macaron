@@ -21,7 +21,18 @@ router = Router()
 MAX_PHOTO_BYTES = 6 * 1024 * 1024
 
 
+def _is_private(msg: Message) -> bool:
+    return msg.chat.type == "private"
+
+
 def _allowed(msg: Message) -> bool:
+    """Можно ли принимать отчёты из этого чата."""
+    if _is_private(msg):
+        if not config.PRIVATE_ENABLED:
+            return False
+        if config.ALLOWED_USER_IDS and msg.from_user:
+            return msg.from_user.id in config.ALLOWED_USER_IDS
+        return True
     if not config.ALLOWED_CHAT_IDS:
         return True
     return msg.chat.id in config.ALLOWED_CHAT_IDS
@@ -46,9 +57,12 @@ def _fmt_dur(minutes: int | None) -> str:
 async def cmd_start(msg: Message):
     await msg.answer(
         "🍝 <b>Makaron Analytics</b>\n\n"
-        "Men guruhdagi sushka hisobotlarini o'qib, dashboardga yig'aman.\n"
-        "Shunchaki odatdagidek yozing:\n"
-        "<code>Burama 9 soat 30 minutda chiqdi</code> + sushka rasmi.\n\n"
+        "Sushka hisobotlarini o'qib, dashboardga yig'aman.\n"
+        "<b>Guruhda</b> ham, <b>shu yerda</b> ham ishlayman — farqi yo'q.\n\n"
+        "Odatdagidek yuboring: sushka rasmi + izoh\n"
+        "<code>Burama 9 soat 30 minutda chiqdi</code>\n\n"
+        "Rasmdan sushka raqamini va tablo ko'rsatkichlarini o'zim o'qiyman. "
+        "Agar raqam ko'rinmasa — so'rayman, siz faqat raqam yuborasiz.\n\n"
         "Buyruqlar: /stats /sushka /oxirgi /dash /id"
     )
 
@@ -151,18 +165,78 @@ async def reply_with_number(msg: Message):
     await msg.reply(f"✅ Sushka №{number} sifatida yozib qo'ydim.")
 
 
+@router.message(F.chat.type == "private", F.text.regexp(r"^\s*\d{1,2}\s*$"))
+async def private_plain_number(msg: Message):
+    """В личке достаточно прислать просто число — закроем последний открытый вопрос."""
+    if not _allowed(msg):
+        return
+    number = int(msg.text.strip())
+    if not (1 <= number <= config.DRYER_COUNT):
+        return await msg.answer(f"Sushka raqami 1–{config.DRYER_COUNT} orasida bo'lishi kerak.")
+    async with session() as s:
+        pend = (await s.execute(
+            select(Pending).where(
+                Pending.chat_id == msg.chat.id,
+                Pending.resolved == False,  # noqa: E712
+            ).order_by(Pending.id.desc()).limit(1)
+        )).scalar_one_or_none()
+        if not pend:
+            return await msg.answer(
+                "Hozir savol yo'q. Rasm va izohni yuboring — o'zim o'qib olaman."
+            )
+        batch = await s.get(Batch, pend.batch_id)
+        if not batch:
+            return
+        pend.resolved = True
+        batch.dryer_number = number
+        batch.needs_review = batch.duration_minutes is None
+        await s.commit()
+        card = _card(batch)
+    await msg.answer(f"✅ Sushka №{number}\n{card}")
+
+
+def _card(b: Batch) -> str:
+    """Короткая карточка распознанной партии."""
+    parts = [
+        f"🍝 <b>{b.product or '—'}</b> · {_fmt_dur(b.duration_minutes)}",
+    ]
+    if b.dryer_number:
+        parts.insert(0, f"🔥 Sushka <b>№{b.dryer_number}</b>")
+    if b.temperature is not None or b.humidity is not None:
+        parts.append(
+            f"🌡 {b.temperature if b.temperature is not None else '—'}°"
+            f" · 💧 {b.humidity if b.humidity is not None else '—'}%"
+        )
+    if b.quality == "defect":
+        parts.append("⚠️ brak belgilandi")
+    elif b.quality == "ok":
+        parts.append("✅ sifat me'yorida")
+    if b.needs_review:
+        parts.append("⚠️ ma'lumot to'liq emas")
+    return "\n".join(parts)
+
+
 # ---------------------------------------------------------------- основной хендлер
 
-@router.message(F.chat.type.in_({"group", "supergroup"}))
-async def on_group_message(msg: Message, bot: Bot):
+@router.message(F.chat.type.in_({"group", "supergroup", "private"}))
+async def on_report_message(msg: Message, bot: Bot):
+    """Отчёт о выгрузке — одинаково из группы и из лички с ботом."""
     if not _allowed(msg):
         return
 
+    private = _is_private(msg)
     caption = (msg.caption or msg.text or "").strip()
     has_photo = bool(msg.photo)
     if not has_photo and not caption:
         return
     if not parser.is_report_message(caption, has_photo):
+        if private:
+            await msg.answer(
+                "Bu xabarni hisobot sifatida tanimadim.\n\n"
+                "Guruhdagidek yozing — rasm + izoh:\n"
+                "<code>Burama 9 soat 30 minutda chiqdi</code>\n\n"
+                "Buyruqlar: /stats /sushka /oxirgi /dash"
+            )
         return
 
     sent_at = (msg.date or dt.datetime.now(dt.timezone.utc)).astimezone(dt.timezone.utc).replace(tzinfo=None)
@@ -203,8 +277,13 @@ async def on_group_message(msg: Message, bot: Bot):
         async with session() as s:
             r = await s.get(RawMessage, raw_id)
             if r:
-                r.parse_error = "ничего не распознано"
+                r.parse_error = parsed.vision_error or "ничего не распознано"
                 await s.commit()
+        if private:
+            await msg.answer(
+                "😕 Bu xabardan hech narsa o'qib olmadim.\n"
+                "Iltimos, izohda vaqtni yozing: <code>Burama 9 soat 30 minutda chiqdi</code>"
+            )
         return
 
     started = None
@@ -241,31 +320,52 @@ async def on_group_message(msg: Message, bot: Bot):
             r.batch_id = batch_id
         await s.commit()
 
-    # 3) если номер сушки не определён — переспросить реплаем
+    # 3) если номер сушки не определён — переспросить
     if parsed.dryer_number is None:
+        found = []
+        if parsed.product:
+            found.append(parsed.product)
+        if parsed.duration_minutes:
+            found.append(_fmt_dur(parsed.duration_minutes))
+        hint = (" O'qiganim: " + " · ".join(found) + ".") if found else ""
         ask = await msg.reply(
-            "🤔 Sushka raqamini o'qiy olmadim. Shu xabarga <b>raqam</b> bilan javob bering (1–%d)."
-            % config.DRYER_COUNT
+            f"🤔 Sushka raqamini o'qiy olmadim.{hint}\n"
+            f"Javob qilib <b>raqam</b> yuboring (1–{config.DRYER_COUNT})."
+            if not private else
+            f"🤔 Sushka raqamini rasmdan o'qiy olmadim.{hint}\n"
+            f"Shunchaki <b>raqam</b> yuboring (1–{config.DRYER_COUNT})."
         )
         async with session() as s:
             s.add(Pending(chat_id=msg.chat.id, ask_message_id=ask.message_id, batch_id=batch_id))
             await s.commit()
         return
 
-    # 4) тихая реакция — не спамим чат
+    abnormal = bool(parsed.duration_minutes) and not (
+        config.NORM_MIN_MINUTES <= parsed.duration_minutes <= config.NORM_MAX_MINUTES
+    )
+    warn = (
+        f"⚠️ {_fmt_dur(parsed.duration_minutes)} — odatdagidan chetda "
+        f"({config.NORM_MIN_MINUTES//60}–{config.NORM_MAX_MINUTES//60} soat)."
+    )
+
+    if private:
+        # в личке отвечаем карточкой — человек должен видеть, что именно записалось
+        async with session() as s:
+            batch = await s.get(Batch, batch_id)
+            card = _card(batch) if batch else ""
+        text = "✅ <b>Yozib oldim</b>\n" + card
+        if abnormal:
+            text += "\n" + warn
+        await msg.answer(text)
+        return
+
+    # в группе не спамим: ставим реакцию, пишем только при аномалии
     try:
         await msg.react([ReactionTypeEmoji(emoji="👌")])
     except Exception:  # noqa: BLE001
         pass
-
-    # предупреждение об аномальном времени
-    if parsed.duration_minutes and not (
-        config.NORM_MIN_MINUTES <= parsed.duration_minutes <= config.NORM_MAX_MINUTES
-    ):
-        await msg.reply(
-            f"⚠️ Sushka №{parsed.dryer_number}: {_fmt_dur(parsed.duration_minutes)} — "
-            f"odatdagidan chetda ({config.NORM_MIN_MINUTES//60}–{config.NORM_MAX_MINUTES//60} soat)."
-        )
+    if abnormal:
+        await msg.reply(f"⚠️ Sushka №{parsed.dryer_number}: {warn[2:]}")
 
 
 async def daily_report_loop(bot: Bot):

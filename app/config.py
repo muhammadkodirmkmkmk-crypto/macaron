@@ -28,6 +28,12 @@ ALLOWED_CHAT_IDS = {int(x) for x in _csv("ALLOWED_CHAT_IDS")}
 # Кто может пользоваться админ-командами (/report, /reset). Пусто = все админы группы.
 ADMIN_USER_IDS = {int(x) for x in _csv("ADMIN_USER_IDS")}
 
+# Принимать отчёты в личке с ботом (не только в группе)
+PRIVATE_ENABLED = os.getenv("PRIVATE_ENABLED", "1") != "0"
+
+# Кто может писать боту в личку. Пусто = любой пользователь.
+ALLOWED_USER_IDS = {int(x) for x in _csv("ALLOWED_USER_IDS")}
+
 # ---------- Anthropic (распознавание фото + разбор текста) ----------
 ANTHROPIC_API_KEY = (os.getenv("ANTHROPIC_API_KEY") or "").strip()
 ANTHROPIC_MODEL = os.getenv("ANTHROPIC_MODEL", "claude-sonnet-4-5")

@@ -1,0 +1,851 @@
+<!doctype html>
+<html lang="ru" data-theme="">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>Makaron Analytics — сушильный цех</title>
+<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'%3E%3Ctext y='.9em' font-size='90'%3E🍝%3C/text%3E%3C/svg%3E">
+<style>
+:root{
+  color-scheme: light;
+  --surface-1:#fcfcfb; --plane:#f9f9f7;
+  --ink-1:#0b0b0b; --ink-2:#52514e; --ink-muted:#898781;
+  --grid:#e1e0d9; --axis:#c3c2b7; --border:rgba(11,11,11,.10);
+  --s1:#2a78d6; --s2:#eb6834; --s3:#1baf7a; --s4:#eda100;
+  --s5:#e87ba4; --s6:#008300; --s7:#4a3aa7; --s8:#e34948;
+  --good:#0ca30c; --warning:#fab219; --serious:#ec835a; --critical:#d03b3b;
+  --success-text:#006300;
+  --seq-1:#cde2fb; --seq-2:#9ec5f4; --seq-3:#6da7ec; --seq-4:#3987e5; --seq-5:#256abf; --seq-6:#184f95;
+  --radius:14px;
+  --font: system-ui,-apple-system,"Segoe UI",sans-serif;
+}
+@media (prefers-color-scheme: dark){
+  :root:where(:not([data-theme="light"])){
+    color-scheme: dark;
+    --surface-1:#1a1a19; --plane:#0d0d0d;
+    --ink-1:#ffffff; --ink-2:#c3c2b7; --ink-muted:#898781;
+    --grid:#2c2c2a; --axis:#383835; --border:rgba(255,255,255,.10);
+    --s1:#3987e5; --s2:#d95926; --s3:#199e70; --s4:#c98500;
+    --s5:#d55181; --s6:#008300; --s7:#9085e9; --s8:#e66767;
+    --success-text:#0ca30c;
+    --seq-1:#104281; --seq-2:#184f95; --seq-3:#1c5cab; --seq-4:#2a78d6; --seq-5:#3987e5; --seq-6:#6da7ec;
+  }
+}
+:root[data-theme="dark"]{
+  color-scheme: dark;
+  --surface-1:#1a1a19; --plane:#0d0d0d;
+  --ink-1:#ffffff; --ink-2:#c3c2b7; --ink-muted:#898781;
+  --grid:#2c2c2a; --axis:#383835; --border:rgba(255,255,255,.10);
+  --s1:#3987e5; --s2:#d95926; --s3:#199e70; --s4:#c98500;
+  --s5:#d55181; --s6:#008300; --s7:#9085e9; --s8:#e66767;
+  --success-text:#0ca30c;
+  --seq-1:#104281; --seq-2:#184f95; --seq-3:#1c5cab; --seq-4:#2a78d6; --seq-5:#3987e5; --seq-6:#6da7ec;
+}
+
+*{box-sizing:border-box}
+body{margin:0;background:var(--plane);color:var(--ink-1);font:15px/1.45 var(--font);
+     -webkit-font-smoothing:antialiased;padding-bottom:64px}
+a{color:var(--s1)}
+.wrap{max-width:1500px;margin:0 auto;padding:20px 20px 0}
+
+header.top{position:sticky;top:0;z-index:40;background:var(--plane);
+  border-bottom:1px solid var(--border);backdrop-filter:saturate(1.4) blur(8px)}
+.top-in{max-width:1500px;margin:0 auto;padding:12px 20px;display:flex;gap:12px;align-items:center;flex-wrap:wrap}
+h1{font-size:17px;margin:0;font-weight:650;letter-spacing:-.01em;display:flex;gap:8px;align-items:center}
+h1 .sub{font-weight:400;color:var(--ink-muted);font-size:13px}
+.spacer{flex:1}
+.seg{display:flex;background:var(--surface-1);border:1px solid var(--border);border-radius:10px;overflow:hidden}
+.seg button{border:0;background:transparent;color:var(--ink-2);padding:7px 12px;font:inherit;font-size:13px;cursor:pointer}
+.seg button[aria-pressed="true"]{background:var(--s1);color:#fff;font-weight:600}
+.btn{border:1px solid var(--border);background:var(--surface-1);color:var(--ink-1);
+  padding:7px 12px;border-radius:10px;font:inherit;font-size:13px;cursor:pointer;text-decoration:none;display:inline-flex;gap:6px;align-items:center}
+.btn:hover{background:var(--grid)}
+.btn.primary{background:var(--s1);border-color:var(--s1);color:#fff;font-weight:600}
+
+section{margin:22px 0}
+h2{font-size:14px;font-weight:650;margin:0 0 4px;letter-spacing:.01em}
+.hint{color:var(--ink-muted);font-size:12.5px;margin:0 0 12px}
+
+.kpis{display:grid;grid-template-columns:repeat(auto-fit,minmax(168px,1fr));gap:12px}
+.tile{background:var(--surface-1);border:1px solid var(--border);border-radius:var(--radius);padding:14px 16px}
+.tile .label{font-size:12px;color:var(--ink-2);margin-bottom:6px}
+.tile .value{font-size:27px;font-weight:640;letter-spacing:-.02em;line-height:1.1}
+.tile .meta{font-size:12px;color:var(--ink-muted);margin-top:4px}
+.tile .value small{font-size:15px;font-weight:500;color:var(--ink-2)}
+
+.grid31{display:grid;grid-template-columns:repeat(auto-fill,minmax(148px,1fr));gap:10px}
+.dry{background:var(--surface-1);border:1px solid var(--border);border-radius:12px;padding:11px 12px;cursor:pointer;
+     position:relative;transition:transform .08s ease}
+.dry:hover{transform:translateY(-1px);border-color:var(--axis)}
+.dry .n{font-size:19px;font-weight:660;letter-spacing:-.02em}
+.dry .st{display:inline-flex;align-items:center;gap:5px;font-size:11.5px;color:var(--ink-2);margin-top:2px}
+.dot{width:9px;height:9px;border-radius:50%;flex:none;box-shadow:0 0 0 2px var(--surface-1)}
+.dry .row{display:flex;justify-content:space-between;gap:6px;font-size:11.5px;color:var(--ink-2);margin-top:7px;align-items:baseline}
+.dry .row>span{white-space:nowrap;overflow:hidden;text-overflow:ellipsis;min-width:0}
+.dry .row b{font-weight:600;color:var(--ink-1);font-variant-numeric:tabular-nums;white-space:nowrap;flex:none}
+.dry .bar{height:4px;border-radius:2px;background:var(--grid);margin-top:8px;overflow:hidden}
+.dry .bar i{display:block;height:100%;border-radius:2px;background:var(--s1)}
+.dry.nodata{opacity:.55}
+
+.cards{display:grid;grid-template-columns:repeat(auto-fit,minmax(380px,1fr));gap:14px}
+.card{background:var(--surface-1);border:1px solid var(--border);border-radius:var(--radius);padding:16px 16px 10px}
+.card h3{font-size:13.5px;margin:0 0 2px;font-weight:640}
+.card .cap{font-size:12px;color:var(--ink-muted);margin:0 0 10px}
+.card.wide{grid-column:1/-1}
+
+svg{display:block;width:100%;overflow:visible}
+.g-line{stroke:var(--grid);stroke-width:1}
+.axis-line{stroke:var(--axis);stroke-width:1}
+.tick{fill:var(--ink-muted);font-size:11px;font-family:var(--font);font-variant-numeric:tabular-nums}
+.dlabel{fill:var(--ink-2);font-size:11px;font-family:var(--font);font-variant-numeric:tabular-nums}
+.ref{stroke:var(--axis);stroke-width:1;stroke-dasharray:4 3}
+.reflabel{fill:var(--ink-muted);font-size:10.5px;font-family:var(--font)}
+.mark{transition:opacity .1s}
+.hit{fill:transparent;cursor:crosshair}
+
+#tip{position:fixed;pointer-events:none;z-index:99;background:var(--surface-1);color:var(--ink-1);
+  border:1px solid var(--border);border-radius:10px;padding:8px 10px;font-size:12.5px;
+  box-shadow:0 6px 22px rgba(0,0,0,.16);opacity:0;transition:opacity .1s;max-width:260px}
+#tip b{font-variant-numeric:tabular-nums}
+#tip .tk{color:var(--ink-2)}
+
+table{width:100%;border-collapse:collapse;font-size:13px}
+th{text-align:left;font-weight:600;color:var(--ink-2);font-size:11.5px;text-transform:uppercase;
+   letter-spacing:.03em;padding:8px 10px;border-bottom:1px solid var(--border);position:sticky;top:0;z-index:2;background:var(--surface-1)}
+td{padding:8px 10px;border-bottom:1px solid var(--border);font-variant-numeric:tabular-nums;vertical-align:top}
+tr:hover td{background:var(--plane)}
+.tbl-wrap{background:var(--surface-1);border:1px solid var(--border);border-radius:var(--radius);overflow:auto;max-height:620px}
+.pill{display:inline-flex;align-items:center;gap:5px;padding:2px 8px;border-radius:20px;font-size:11.5px;
+      border:1px solid var(--border);white-space:nowrap}
+.filters{display:flex;gap:8px;flex-wrap:wrap;align-items:center;margin-bottom:10px}
+.filters input,.filters select{background:var(--surface-1);border:1px solid var(--border);color:var(--ink-1);
+  border-radius:9px;padding:7px 10px;font:inherit;font-size:13px}
+.legend{display:flex;gap:14px;flex-wrap:wrap;font-size:12px;color:var(--ink-2);margin:6px 0 0}
+.legend i{width:10px;height:10px;border-radius:3px;display:inline-block;margin-right:5px;vertical-align:-1px}
+.empty{color:var(--ink-muted);font-size:13px;padding:26px;text-align:center}
+.muted{color:var(--ink-muted)}
+.err{background:var(--critical);color:#fff;padding:10px 14px;border-radius:10px;font-size:13px;margin:10px 0}
+dialog{border:1px solid var(--border);border-radius:var(--radius);background:var(--surface-1);color:var(--ink-1);
+  padding:0;max-width:min(560px,92vw);width:100%}
+dialog::backdrop{background:rgba(0,0,0,.45)}
+.dlg-h{padding:14px 18px;border-bottom:1px solid var(--border);display:flex;align-items:center;gap:10px}
+.dlg-b{padding:16px 18px;max-height:64vh;overflow:auto}
+@media (max-width:640px){.tile .value{font-size:23px}.wrap{padding:14px 12px 0}.top-in{padding:10px 12px}}
+@media print{.no-print{display:none}}
+</style>
+</head>
+<body>
+
+<header class="top no-print">
+  <div class="top-in">
+    <h1>🍝 Makaron Analytics <span class="sub" id="subtitle">сушильный цех</span></h1>
+    <div class="spacer"></div>
+    <div class="seg" id="period" role="group" aria-label="Период">
+      <button data-days="1" aria-pressed="false">24ч</button>
+      <button data-days="7" aria-pressed="true">7д</button>
+      <button data-days="30" aria-pressed="false">30д</button>
+      <button data-days="90" aria-pressed="false">90д</button>
+    </div>
+    <button class="btn" id="langBtn" title="Til / Язык">UZ</button>
+    <button class="btn" id="themeBtn" title="Тема">◐</button>
+    <a class="btn" id="exportBtn" href="/api/export.xlsx?days=7">⤓ Excel</a>
+    <button class="btn primary" id="refreshBtn">↻</button>
+  </div>
+</header>
+
+<div class="wrap">
+  <div id="error"></div>
+
+  <section>
+    <div class="kpis" id="kpis"></div>
+  </section>
+
+  <section>
+    <h2 data-i="dryers_h">Сушки — текущее состояние</h2>
+    <p class="hint" data-i="dryers_hint">Статус оценивается по времени с последнего отчёта относительно среднего цикла этой сушки. Нажмите на карточку — история партий.</p>
+    <div class="legend" id="dryLegend"></div>
+    <div class="grid31" id="dryers" style="margin-top:10px"></div>
+  </section>
+
+  <section>
+    <div class="cards">
+      <div class="card"><h3 data-i="c_prod">Среднее время сушки по продукту</h3>
+        <p class="cap" data-i="c_prod_cap">Точка — среднее, линия — разброс от минимума до максимума.</p>
+        <div id="chProduct"></div></div>
+
+      <div class="card"><h3 data-i="c_daily">Партий в день</h3>
+        <p class="cap" data-i="c_daily_cap">Сколько партий выгружено за сутки.</p>
+        <div id="chDaily"></div></div>
+
+      <div class="card"><h3 data-i="c_trend">Тренд среднего времени сушки</h3>
+        <p class="cap" data-i="c_trend_cap">Среднее за сутки, в часах.</p>
+        <div id="chTrend"></div></div>
+
+      <div class="card"><h3 data-i="c_hist">Распределение времени сушки</h3>
+        <p class="cap" data-i="c_hist_cap">Сколько партий попало в каждый часовой интервал.</p>
+        <div id="chHist"></div></div>
+
+      <div class="card wide"><h3 data-i="c_dryer">Среднее время по каждой сушке</h3>
+        <p class="cap" data-i="c_dryer_cap">Пунктир — среднее по цеху. Столбцы выше пунктира сушат дольше остальных.</p>
+        <div id="chDryers"></div></div>
+
+      <div class="card"><h3 data-i="c_hour">Когда выгружают партии</h3>
+        <p class="cap" data-i="c_hour_cap">Количество выгрузок по часам суток.</p>
+        <div id="chHours"></div></div>
+
+      <div class="card"><h3 data-i="c_def">Брак по сушкам</h3>
+        <p class="cap" data-i="c_def_cap">Партии, отмеченные как «trewena bor» и подобные.</p>
+        <div id="chDefects"></div></div>
+
+      <div class="card wide"><h3 data-i="c_matrix">Продукт × сушка: среднее время</h3>
+        <p class="cap" data-i="c_matrix_cap">Темнее — дольше сушится. Пустая ячейка — такой продукт на этой сушке не запускали.</p>
+        <div id="chMatrix"></div></div>
+    </div>
+  </section>
+
+  <section>
+    <div class="cards">
+      <div class="card"><h3 data-i="t_out">Сильнее всего выбиваются из нормы</h3>
+        <p class="cap" data-i="t_out_cap">Отклонение партии от среднего по своему продукту.</p>
+        <div id="tblOutliers"></div></div>
+      <div class="card"><h3 data-i="t_ops">Операторы</h3>
+        <p class="cap" data-i="t_ops_cap">Кто и сколько отчётов присылает.</p>
+        <div id="tblOps"></div></div>
+    </div>
+  </section>
+
+  <section>
+    <h2 data-i="t_all">Все партии</h2>
+    <p class="hint" data-i="t_all_cap">Таблица со всеми распознанными записями. Клик по строке — карточка партии и ручная правка.</p>
+    <div class="filters no-print">
+      <input id="fSearch" placeholder="Поиск: продукт, оператор, текст…" style="min-width:240px">
+      <select id="fDryer"><option value="">Все сушки</option></select>
+      <select id="fProduct"><option value="">Все продукты</option></select>
+      <select id="fQuality">
+        <option value="">Любое качество</option>
+        <option value="ok">Без брака</option>
+        <option value="defect">Брак</option>
+        <option value="unknown">Не указано</option>
+      </select>
+      <label class="pill" style="cursor:pointer"><input type="checkbox" id="fReview"> <span data-i="f_review">Только требующие проверки</span></label>
+      <span class="muted" id="tblCount"></span>
+    </div>
+    <div class="tbl-wrap" id="tblAll"></div>
+  </section>
+
+  <p class="muted" style="font-size:12px;margin:22px 0 0" id="footer"></p>
+</div>
+
+<div id="tip" role="tooltip"></div>
+
+<dialog id="dlg">
+  <div class="dlg-h"><b id="dlgTitle"></b><div class="spacer" style="flex:1"></div>
+    <button class="btn" onclick="document.getElementById('dlg').close()">✕</button></div>
+  <div class="dlg-b" id="dlgBody"></div>
+</dialog>
+
+<script>
+/* ------------------------------------------------------------------ i18n */
+const I18N = {
+  ru:{
+    subtitle:"сушильный цех",
+    k_today:"Партий сегодня", k_total:"Партий за период", k_avg:"Среднее время сушки",
+    k_med:"Медиана", k_def:"Уровень брака", k_util:"Загрузка парка",
+    k_active:"Сушек в работе", k_review:"Требуют проверки",
+    dryers_h:"Сушки — текущее состояние",
+    dryers_hint:"Статус оценивается по времени с последнего отчёта относительно среднего цикла этой сушки. Нажмите на карточку — история партий.",
+    c_prod:"Среднее время сушки по продукту", c_prod_cap:"Точка — среднее, линия — разброс от минимума до максимума.",
+    c_daily:"Партий в день", c_daily_cap:"Сколько партий выгружено за сутки.",
+    c_trend:"Тренд среднего времени сушки", c_trend_cap:"Среднее за сутки, в часах.",
+    c_hist:"Распределение времени сушки", c_hist_cap:"Сколько партий попало в каждый часовой интервал.",
+    c_dryer:"Среднее время по каждой сушке", c_dryer_cap:"Пунктир — среднее по цеху. Столбцы выше пунктира сушат дольше остальных.",
+    c_hour:"Когда выгружают партии", c_hour_cap:"Количество выгрузок по часам суток.",
+    c_def:"Брак по сушкам", c_def_cap:"Партии, отмеченные как «trewena bor» и подобные.",
+    c_matrix:"Продукт × сушка: среднее время", c_matrix_cap:"Темнее — дольше сушится. Пустая ячейка — такой продукт на этой сушке не запускали.",
+    t_out:"Сильнее всего выбиваются из нормы", t_out_cap:"Отклонение партии от среднего по своему продукту.",
+    t_ops:"Операторы", t_ops_cap:"Кто и сколько отчётов присылает.",
+    t_all:"Все партии", t_all_cap:"Таблица со всеми распознанными записями. Клик по строке — карточка партии и ручная правка.",
+    f_review:"Только требующие проверки",
+    st_running:"в работе", st_overdue:"запаздывает", st_stale:"молчит", st_no_data:"нет данных",
+    th_dryer:"Сушка", th_product:"Продукт", th_dur:"Время", th_fin:"Выгружено", th_t:"t°", th_h:"Влажн.",
+    th_q:"Качество", th_op:"Оператор", th_note:"Заметка", th_count:"Партий", th_avg:"Среднее",
+    th_delta:"Отклонение", th_def:"Брак", th_last:"Последний",
+    q_ok:"норма", q_defect:"брак", q_unknown:"—",
+    none:"Нет данных за выбранный период.",
+    batches:"партий", hours:"ч", minutes:"мин", of:"из", save:"Сохранить", del:"Удалить",
+    conf:"Уверенность распознавания", raw:"Исходное сообщение", review:"проверить",
+    updated:"Обновлено", period:"Период", tz:"Часовой пояс",
+  },
+  uz:{
+    subtitle:"quritish sexi",
+    k_today:"Bugungi partiyalar", k_total:"Davr partiyalari", k_avg:"O'rtacha sushish vaqti",
+    k_med:"Mediana", k_def:"Brak darajasi", k_util:"Park yuklamasi",
+    k_active:"Ishlayotgan sushkalar", k_review:"Tekshirish kerak",
+    dryers_h:"Sushkalar — hozirgi holat",
+    dryers_hint:"Holat oxirgi xabardan o'tgan vaqt va shu sushkaning o'rtacha sikliga qarab baholanadi. Kartochkani bosing — partiyalar tarixi.",
+    c_prod:"Mahsulot bo'yicha o'rtacha vaqt", c_prod_cap:"Nuqta — o'rtacha, chiziq — min va maks orasidagi tarqalish.",
+    c_daily:"Kunlik partiyalar", c_daily_cap:"Bir kunda nechta partiya chiqdi.",
+    c_trend:"O'rtacha vaqt dinamikasi", c_trend_cap:"Kunlik o'rtacha, soatda.",
+    c_hist:"Sushish vaqti taqsimoti", c_hist_cap:"Har bir soatlik oraliqqa nechta partiya tushdi.",
+    c_dryer:"Har bir sushka bo'yicha o'rtacha", c_dryer_cap:"Punktir — sex bo'yicha o'rtacha. Undan baland ustunlar sekinroq quritadi.",
+    c_hour:"Partiyalar qachon chiqadi", c_hour_cap:"Kun soatlari bo'yicha chiqishlar soni.",
+    c_def:"Sushkalar bo'yicha brak", c_def_cap:"«trewena bor» kabi belgilangan partiyalar.",
+    c_matrix:"Mahsulot × sushka: o'rtacha vaqt", c_matrix_cap:"Qora — uzoqroq quriydi. Bo'sh katak — bu mahsulot bu sushkada ishlatilmagan.",
+    t_out:"Me'yordan eng ko'p chetlashganlar", t_out_cap:"Partiyaning o'z mahsuloti o'rtachasidan farqi.",
+    t_ops:"Operatorlar", t_ops_cap:"Kim qancha hisobot yuboradi.",
+    t_all:"Barcha partiyalar", t_all_cap:"Barcha yozuvlar jadvali. Qatorni bosing — partiya kartochkasi va qo'lda tuzatish.",
+    f_review:"Faqat tekshirish kerak bo'lganlar",
+    st_running:"ishlayapti", st_overdue:"kechikmoqda", st_stale:"jim", st_no_data:"ma'lumot yo'q",
+    th_dryer:"Sushka", th_product:"Mahsulot", th_dur:"Vaqt", th_fin:"Chiqdi", th_t:"t°", th_h:"Namlik",
+    th_q:"Sifat", th_op:"Operator", th_note:"Izoh", th_count:"Partiya", th_avg:"O'rtacha",
+    th_delta:"Farq", th_def:"Brak", th_last:"Oxirgi",
+    q_ok:"me'yor", q_defect:"brak", q_unknown:"—",
+    none:"Tanlangan davr uchun ma'lumot yo'q.",
+    batches:"partiya", hours:"s", minutes:"min", of:"/", save:"Saqlash", del:"O'chirish",
+    conf:"Tanib olish ishonchi", raw:"Asl xabar", review:"tekshirish",
+    updated:"Yangilandi", period:"Davr", tz:"Vaqt mintaqasi",
+  }
+};
+let LANG = localStorage.getItem("lang") || "ru";
+const t = k => (I18N[LANG][k] ?? I18N.ru[k] ?? k);
+
+/* ------------------------------------------------------------------ utils */
+const $ = s => document.querySelector(s);
+const el = (tag, attrs={}, kids=[]) => {
+  const n = document.createElementNS(tag==="svg"||SVG_TAGS.has(tag) ? "http://www.w3.org/2000/svg":"http://www.w3.org/1999/xhtml", tag);
+  for (const [k,v] of Object.entries(attrs)) if (v!=null) n.setAttribute(k,v);
+  for (const k of [].concat(kids)) n.append(k);
+  return n;
+};
+const SVG_TAGS = new Set(["svg","g","rect","path","line","text","circle","polyline","defs","clipPath","title"]);
+const css = v => getComputedStyle(document.documentElement).getPropertyValue(v).trim();
+const fmtH = m => m==null ? "—" : `${Math.floor(m/60)}:${String(m%60).padStart(2,"0")}`;
+const fmtHm = m => m==null ? "—" : `${Math.floor(m/60)}${t("hours")} ${String(m%60).padStart(2,"0")}${LANG==="ru"?"м":"m"}`;
+const fmtDate = iso => { if(!iso) return "—"; const d=new Date(iso);
+  return d.toLocaleString(LANG==="ru"?"ru-RU":"uz-UZ",{day:"2-digit",month:"2-digit",hour:"2-digit",minute:"2-digit"}); };
+const esc = s => String(s??"").replace(/[&<>"]/g,c=>({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;"}[c]));
+
+const STATUS_COLOR = {running:"--good", overdue:"--warning", stale:"--critical", no_data:"--ink-muted"};
+const STATUS_ICON  = {running:"●", overdue:"◐", stale:"○", no_data:"·"};
+
+/* tooltip */
+const tip = $("#tip");
+function showTip(ev, html){
+  tip.innerHTML = html; tip.style.opacity = 1;
+  const r = tip.getBoundingClientRect();
+  let x = ev.clientX + 14, y = ev.clientY - r.height - 12;
+  if (x + r.width > innerWidth - 8) x = ev.clientX - r.width - 14;
+  if (y < 8) y = ev.clientY + 18;
+  tip.style.left = x+"px"; tip.style.top = y+"px";
+}
+const hideTip = () => tip.style.opacity = 0;
+addEventListener("scroll", hideTip, {passive:true});
+
+/* ------------------------------------------------------------------ charts */
+function frame(host, {h=230, padL=44, padR=14, padT=12, padB=30}={}){
+  host.innerHTML = "";
+  const w = Math.max(280, host.clientWidth || 380);
+  const svg = el("svg",{viewBox:`0 0 ${w} ${h}`, height:h, role:"img"});
+  host.append(svg);
+  return {svg, w, h, x0:padL, x1:w-padR, y0:padT, y1:h-padB, iw:w-padL-padR, ih:h-padT-padB};
+}
+function yAxis(f, max, fmt=(v=>v), ticks=4){
+  for(let i=0;i<=ticks;i++){
+    const v = max*i/ticks, y = f.y1 - (f.ih*i/ticks);
+    f.svg.append(el("line",{x1:f.x0,x2:f.x1,y1:y,y2:y,class:i?"g-line":"axis-line"}));
+    const tx = el("text",{x:f.x0-7,y:y+4,class:"tick","text-anchor":"end"}); tx.textContent = fmt(v);
+    f.svg.append(tx);
+  }
+}
+function barTop(x,y,w,h,r=4){
+  r = Math.min(r, w/2, Math.max(h,0));
+  if (h<=0) return `M${x},${y}h${w}`;
+  return `M${x},${y+h}V${y+r}a${r},${r} 0 0 1 ${r},${-r}h${w-2*r}a${r},${r} 0 0 1 ${r},${r}V${y+h}Z`;
+}
+function barRight(x,y,w,h,r=4){
+  r = Math.min(r, h/2, Math.max(w,0));
+  if (w<=0) return `M${x},${y}v${h}`;
+  return `M${x},${y}h${w-r}a${r},${r} 0 0 1 ${r},${r}v${h-2*r}a${r},${r} 0 0 1 ${-r},${r}H${x}Z`;
+}
+
+/** Вертикальные столбцы, одна серия. */
+function vbars(host, data, {value, label, color="--s1", fmt=(v=>v), tipHtml, h=230, refLine=null,
+                            refLabel="", labelEvery=1, directLabels=false, range=null}={}){
+  if(!data.length){ host.innerHTML = `<p class="empty">${t("none")}</p>`; return; }
+  const f = frame(host,{h});
+  const maxV = Math.max(...data.map(value), refLine||0, 1);
+  const max = maxV*1.12;
+  yAxis(f, max, fmt);
+  const step = f.iw/data.length, bw = Math.max(3, Math.min(38, step*0.62));
+  const c = css(color);
+  data.forEach((d,i)=>{
+    const v = value(d)||0;
+    const bh = f.ih*v/max, x = f.x0 + step*i + (step-bw)/2, y = f.y1-bh;
+    const p = el("path",{d:barTop(x,y,bw,bh), fill:c, class:"mark"});
+    f.svg.append(p);
+    if(range){
+      const [lo,hi] = range(d);
+      if(lo!=null && hi!=null && hi>lo){
+        const yl = f.y1-f.ih*lo/max, yh = f.y1-f.ih*hi/max, cx = x+bw/2;
+        f.svg.append(el("line",{x1:cx,x2:cx,y1:yl,y2:yh,stroke:css("--ink-muted"),"stroke-width":2,"stroke-linecap":"round","opacity":.85}));
+      }
+    }
+    if(directLabels && v){
+      const tx = el("text",{x:x+bw/2,y:y-5,class:"dlabel","text-anchor":"middle"});
+      tx.textContent = fmt(v); f.svg.append(tx);
+    }
+    const hit = el("rect",{x:f.x0+step*i,y:f.y0,width:step,height:f.ih,class:"hit"});
+    hit.addEventListener("mousemove", e=>showTip(e, tipHtml(d)));
+    hit.addEventListener("mouseleave", hideTip);
+    f.svg.append(hit);
+    if(i%labelEvery===0){
+      const lx = el("text",{x:x+bw/2,y:f.y1+15,class:"tick","text-anchor":"middle"});
+      lx.textContent = label(d); f.svg.append(lx);
+    }
+  });
+  if(refLine){
+    const y = f.y1 - f.ih*refLine/max;
+    f.svg.append(el("line",{x1:f.x0,x2:f.x1,y1:y,y2:y,class:"ref"}));
+    const rl = el("text",{x:f.x0+4,y:y-6,class:"reflabel","text-anchor":"start"});
+    rl.textContent = refLabel; f.svg.append(rl);
+  }
+}
+
+/** Горизонтальные столбцы — для длинных подписей. */
+function hbars(host, data, {value, label, color="--s1", fmt=(v=>v), tipHtml, range=null}={}){
+  if(!data.length){ host.innerHTML = `<p class="empty">${t("none")}</p>`; return; }
+  const rowH = 30, h = Math.max(120, data.length*rowH+24);
+  const f = frame(host,{h, padL:98, padR:52, padT:6, padB:18});
+  const max = Math.max(...data.map(value),1)*1.1;
+  const c = css(color);
+  data.forEach((d,i)=>{
+    const v = value(d)||0, y = f.y0 + i*rowH + 6, bh = 14;
+    const bw = f.iw*v/max;
+    f.svg.append(el("path",{d:barRight(f.x0,y,bw,bh), fill:c, class:"mark"}));
+    const lb = el("text",{x:f.x0-8,y:y+bh-2,class:"tick","text-anchor":"end"});
+    lb.textContent = label(d); f.svg.append(lb);
+    const vl = el("text",{x:f.x0+bw+7,y:y+bh-2,class:"dlabel"});
+    vl.textContent = fmt(v); f.svg.append(vl);
+    const hit = el("rect",{x:0,y:y-5,width:f.w,height:rowH,class:"hit"});
+    hit.addEventListener("mousemove", e=>showTip(e,tipHtml(d)));
+    hit.addEventListener("mouseleave", hideTip);
+    f.svg.append(hit);
+  });
+}
+
+/** Диапазон min–max тонкой линией + точка среднего. Одна серия, без легенды. */
+function rangeDots(host, data, {lo, hi, mid, label, color="--s1", fmt=(v=>v), tipHtml}={}){
+  if(!data.length){ host.innerHTML = `<p class="empty">${t("none")}</p>`; return; }
+  const rowH = 34, h = data.length*rowH + 40;
+  const f = frame(host,{h, padL:96, padR:58, padT:8, padB:26});
+  const vals = data.flatMap(d=>[lo(d),hi(d),mid(d)]).filter(v=>v!=null);
+  const vmax = Math.max(...vals)*1.06, vmin = 0;
+  const X = v => f.x0 + f.iw*(v-vmin)/((vmax-vmin)||1);
+  const c = css(color), muted = css("--ink-muted");
+
+  for(let i=0;i<=4;i++){
+    const v = vmax*i/4, x = X(v);
+    f.svg.append(el("line",{x1:x,x2:x,y1:f.y0,y2:f.y1,class:i?"g-line":"axis-line"}));
+    const tx = el("text",{x, y:f.y1+15, class:"tick","text-anchor":"middle"}); tx.textContent = fmt(v);
+    f.svg.append(tx);
+  }
+  data.forEach((d,i)=>{
+    const y = f.y0 + i*rowH + rowH/2;
+    const a = lo(d), b = hi(d), m = mid(d);
+    if(a!=null && b!=null && b>a){
+      f.svg.append(el("line",{x1:X(a),x2:X(b),y1:y,y2:y,stroke:muted,"stroke-width":2,"stroke-linecap":"round",opacity:.65}));
+      [a,b].forEach(v=>f.svg.append(el("line",{x1:X(v),x2:X(v),y1:y-5,y2:y+5,stroke:muted,"stroke-width":2,"stroke-linecap":"round",opacity:.65})));
+    }
+    if(m!=null){
+      f.svg.append(el("circle",{cx:X(m),cy:y,r:6,fill:c,stroke:css("--surface-1"),"stroke-width":2}));
+      const vl = el("text",{x:f.x1+8,y:y+4,class:"dlabel"}); vl.textContent = fmt(m); f.svg.append(vl);
+    }
+    const lb = el("text",{x:f.x0-10,y:y+4,class:"tick","text-anchor":"end"}); lb.textContent = label(d); f.svg.append(lb);
+    const hit = el("rect",{x:0,y:y-rowH/2,width:f.w,height:rowH,class:"hit"});
+    hit.addEventListener("mousemove", e=>showTip(e,tipHtml(d)));
+    hit.addEventListener("mouseleave", hideTip);
+    f.svg.append(hit);
+  });
+  const lg = document.createElement("div");
+  lg.className = "legend";
+  lg.innerHTML = `<span><i style="background:${c};border-radius:50%"></i>${LANG==="ru"?"среднее":"o'rtacha"}</span>`+
+    `<span><i style="background:${muted};height:2px;border-radius:2px;width:16px"></i>min – max</span>`;
+  host.append(lg);
+}
+
+/** Линия с точками и перекрестием. */
+function lineChart(host, data, {value, label, color="--s1", fmt=(v=>v), tipHtml, h=230, labelEvery=1}={}){
+  const pts = data.filter(d=>value(d)!=null);
+  if(pts.length<1){ host.innerHTML = `<p class="empty">${t("none")}</p>`; return; }
+  const f = frame(host,{h});
+  const vals = pts.map(value);
+  const max = Math.max(...vals)*1.15, min = 0;
+  yAxis(f, max, fmt);
+  const step = data.length>1 ? f.iw/(data.length-1) : 0;
+  const c = css(color);
+  const X = i => f.x0 + step*i, Y = v => f.y1 - f.ih*(v-min)/(max-min||1);
+  const segs = [];
+  let run = [];
+  data.forEach((d,i)=>{ const v=value(d); if(v==null){ if(run.length)segs.push(run); run=[]; } else run.push([X(i),Y(v)]); });
+  if(run.length) segs.push(run);
+  segs.forEach(sg=>{
+    f.svg.append(el("path",{d:"M"+sg.map(p=>p.join(",")).join("L"), fill:"none", stroke:c,
+      "stroke-width":2, "stroke-linejoin":"round", "stroke-linecap":"round"}));
+  });
+  data.forEach((d,i)=>{
+    const v = value(d); if(v==null) return;
+    f.svg.append(el("circle",{cx:X(i),cy:Y(v),r:4.5,fill:c,stroke:css("--surface-1"),"stroke-width":2}));
+  });
+  const cross = el("line",{x1:0,x2:0,y1:f.y0,y2:f.y1,stroke:css("--axis"),"stroke-width":1,opacity:0});
+  f.svg.append(cross);
+  const hit = el("rect",{x:f.x0-step/2,y:f.y0,width:f.iw+step,height:f.ih,class:"hit"});
+  hit.addEventListener("mousemove", e=>{
+    const bb = f.svg.getBoundingClientRect();
+    const rel = (e.clientX-bb.left)/bb.width*f.w;
+    const i = Math.max(0, Math.min(data.length-1, Math.round((rel-f.x0)/(step||1))));
+    cross.setAttribute("x1",X(i)); cross.setAttribute("x2",X(i)); cross.setAttribute("opacity",.7);
+    showTip(e, tipHtml(data[i]));
+  });
+  hit.addEventListener("mouseleave", ()=>{cross.setAttribute("opacity",0); hideTip();});
+  f.svg.append(hit);
+  data.forEach((d,i)=>{ if(i%labelEvery===0){
+    const lx = el("text",{x:X(i),y:f.y1+15,class:"tick","text-anchor":"middle"});
+    lx.textContent = label(d); f.svg.append(lx);
+  }});
+}
+
+/** Тепловая карта (последовательная шкала одного тона). */
+function heatmap(host, {rows, cols, get, fmt, tipHtml}){
+  host.innerHTML="";
+  if(!rows.length||!cols.length){ host.innerHTML=`<p class="empty">${t("none")}</p>`; return; }
+  const vals = [];
+  rows.forEach(r=>cols.forEach(c=>{const v=get(r,c); if(v!=null) vals.push(v);}));
+  if(!vals.length){ host.innerHTML=`<p class="empty">${t("none")}</p>`; return; }
+  const lo = Math.min(...vals), hi = Math.max(...vals);
+  const ramp = ["--seq-1","--seq-2","--seq-3","--seq-4","--seq-5","--seq-6"].map(css);
+  const bucket = v => ramp[Math.min(ramp.length-1, Math.floor((v-lo)/((hi-lo)||1)*ramp.length))];
+
+  const cell = 26, labelW = 92, headH = 22;
+  const w = labelW + cols.length*cell, h = headH + rows.length*cell + 6;
+  const svg = el("svg",{viewBox:`0 0 ${w} ${h}`, width:w, height:h,
+    preserveAspectRatio:"xMinYMin meet", style:`width:${w}px;min-width:${w}px;flex:none`});
+  cols.forEach((c,j)=>{
+    const tx = el("text",{x:labelW+j*cell+cell/2, y:headH-8, class:"tick","text-anchor":"middle"});
+    tx.textContent = c; svg.append(tx);
+  });
+  rows.forEach((r,i)=>{
+    const ty = el("text",{x:labelW-8,y:headH+i*cell+cell/2+4,class:"tick","text-anchor":"end"});
+    ty.textContent = r; svg.append(ty);
+    cols.forEach((c,j)=>{
+      const v = get(r,c);
+      const rect = el("rect",{x:labelW+j*cell+1, y:headH+i*cell+1, width:cell-2, height:cell-2, rx:4,
+        fill: v==null ? css("--grid") : bucket(v), opacity: v==null?.45:1, class:"mark"});
+      rect.addEventListener("mousemove", e=>showTip(e, tipHtml(r,c,v)));
+      rect.addEventListener("mouseleave", hideTip);
+      svg.append(rect);
+    });
+  });
+  const scroll = el("div",{style:"overflow-x:auto"}); scroll.append(svg);
+  const lg = el("div",{class:"legend"});
+  lg.innerHTML = `<span>${fmt(lo)}</span>` + ramp.map(c=>`<i style="background:${c};margin:0"></i>`).join("") + `<span>${fmt(hi)}</span>`;
+  host.append(scroll, lg);
+}
+
+/* ------------------------------------------------------------------ state */
+let DAYS = +(localStorage.getItem("days")||7);
+let DATA = null;
+
+async function load(){
+  $("#error").innerHTML = "";
+  try{
+    const r = await fetch(`/api/dashboard?days=${DAYS}`, {headers:{"Accept":"application/json"}});
+    if(r.status===401){ location.href="/login"; return; }
+    if(!r.ok) throw new Error("HTTP "+r.status);
+    DATA = await r.json();
+    render();
+  }catch(e){
+    $("#error").innerHTML = `<div class="err">Не удалось загрузить данные: ${esc(e.message)}</div>`;
+  }
+}
+
+/* ------------------------------------------------------------------ render */
+function render(){
+  if(!DATA) return;
+  document.documentElement.lang = LANG==="ru"?"ru":"uz";
+  document.querySelectorAll("[data-i]").forEach(n=>{ n.textContent = t(n.dataset.i); });
+  $("#subtitle").textContent = t("subtitle");
+  $("#langBtn").textContent = LANG==="ru" ? "UZ" : "RU";
+  $("#exportBtn").href = `/api/export.xlsx?days=${DAYS}`;
+
+  const k = DATA.kpi;
+  $("#kpis").innerHTML = [
+    tile(t("k_today"), k.batches_today, `${t("k_total")}: ${k.batches_total}`),
+    tile(t("k_avg"), k.avg_duration!=null ? fmtHm(k.avg_duration) : "—", `${t("k_med")}: ${k.median_duration!=null?fmtHm(k.median_duration):"—"}`),
+    tile(t("k_def"), k.defect_rate!=null ? k.defect_rate+"%" : "—", `${k.defects} ${t("of")} ${k.graded}`,
+         k.defect_rate!=null && k.defect_rate>5 ? "--critical" : null),
+    tile(t("k_util"), k.utilization+"%", `${DATA.days} ${LANG==="ru"?"дн.":"kun"} × ${k.dryer_count}`),
+    tile(t("k_active"), `${k.active_dryers}<small> / ${k.dryer_count}</small>`, ""),
+    tile(t("k_review"), k.needs_review, k.needs_review ? `⚠︎ ${t("review")}` : "✓", k.needs_review ? "--warning" : null),
+  ].join("");
+
+  renderDryers();
+  renderCharts();
+  renderTables();
+
+  $("#footer").textContent =
+    `${t("updated")}: ${fmtDate(DATA.generated_at)} · ${t("period")}: ${DATA.days} · ${t("tz")}: ${DATA.timezone}`;
+}
+
+function tile(label, value, meta, accent){
+  return `<div class="tile"><div class="label">${esc(label)}</div>
+    <div class="value"${accent?` style="color:${css(accent)}"`:""}>${value}</div>
+    <div class="meta">${esc(meta||"")}</div></div>`;
+}
+
+function renderDryers(){
+  const box = $("#dryers"); box.innerHTML = "";
+  $("#dryLegend").innerHTML = ["running","overdue","stale","no_data"].map(s=>
+    `<span><i style="background:${css(STATUS_COLOR[s])};border-radius:50%"></i>${esc(t("st_"+s))}</span>`).join("");
+
+  DATA.dryers.forEach(d=>{
+    const pct = d.since_minutes!=null && d.expected_minutes
+      ? Math.min(100, Math.round(100*d.since_minutes/d.expected_minutes)) : 0;
+    const n = document.createElement("div");
+    n.className = "dry" + (d.status==="no_data" ? " nodata" : "");
+    n.innerHTML = `
+      <div class="n">№${d.number}</div>
+      <div class="st"><span class="dot" style="background:${css(STATUS_COLOR[d.status])}"></span>
+        <span>${STATUS_ICON[d.status]} ${esc(t("st_"+d.status))}</span></div>
+      <div class="row"><span>${esc(d.last_product||"—")}</span><b>${d.last_duration!=null?fmtH(d.last_duration):"—"}</b></div>
+      <div class="row"><span class="muted">${t("th_avg")}</span><b>${d.avg!=null?fmtH(d.avg):"—"}</b></div>
+      <div class="row"><span class="muted">${d.batches} ${t("batches")}</span>
+        <b title="t° / ${esc(t("th_h"))}">${d.temperature!=null? d.temperature+"°":""}${d.humidity!=null? " · "+d.humidity+"%":""}</b></div>
+      <div class="bar"><i style="width:${pct}%;background:${css(STATUS_COLOR[d.status])}"></i></div>`;
+    n.addEventListener("mousemove", e=>showTip(e,
+      `<b>Сушка №${d.number}</b><br>
+       <span class="tk">${t("th_count")}:</span> <b>${d.batches}</b><br>
+       <span class="tk">${t("th_avg")}:</span> <b>${d.avg!=null?fmtHm(d.avg):"—"}</b><br>
+       <span class="tk">min/max:</span> <b>${d.min!=null?fmtH(d.min):"—"} / ${d.max!=null?fmtH(d.max):"—"}</b><br>
+       <span class="tk">${t("th_def")}:</span> <b>${d.defects}${d.defect_rate!=null?" ("+d.defect_rate+"%)":""}</b><br>
+       <span class="tk">${t("th_last")}:</span> <b>${fmtDate(d.last_finished_at)}</b>`));
+    n.addEventListener("mouseleave", hideTip);
+    n.addEventListener("click", ()=>openDryer(d.number));
+    box.append(n);
+  });
+}
+
+function renderCharts(){
+  const P = DATA.products.filter(p=>p.avg!=null).slice(0,10);
+  rangeDots($("#chProduct"), P, {
+    lo:p=>p.min, hi:p=>p.max, mid:p=>p.avg, label:p=>p.product, fmt:v=>fmtH(Math.round(v)),
+    tipHtml:p=>`<b>${esc(p.product)}</b><br>
+      <span class="tk">${t("th_avg")}:</span> <b>${fmtHm(p.avg)}</b><br>
+      <span class="tk">min–max:</span> <b>${fmtH(p.min)} – ${fmtH(p.max)}</b><br>
+      <span class="tk">${t("th_count")}:</span> <b>${p.count}</b><br>
+      <span class="tk">${t("th_def")}:</span> <b>${p.defects}${p.defect_rate!=null?" ("+p.defect_rate+"%)":""}</b>`
+  });
+
+  const TL = DATA.timeline;
+  const every = Math.max(1, Math.ceil(TL.length/10));
+  vbars($("#chDaily"), TL, {
+    value:d=>d.count, label:d=>d.date.slice(8)+"."+d.date.slice(5,7), fmt:v=>Math.round(v),
+    labelEvery:every,
+    tipHtml:d=>`<b>${fmtDateOnly(d.date)}</b><br><span class="tk">${t("th_count")}:</span> <b>${d.count}</b><br>
+      <span class="tk">${t("th_avg")}:</span> <b>${d.avg!=null?fmtHm(d.avg):"—"}</b><br>
+      <span class="tk">${t("th_def")}:</span> <b>${d.defects}</b>`
+  });
+
+  lineChart($("#chTrend"), TL, {
+    value:d=>d.avg!=null ? +(d.avg/60).toFixed(2) : null,
+    label:d=>d.date.slice(8)+"."+d.date.slice(5,7), fmt:v=>v.toFixed(1), labelEvery:every,
+    tipHtml:d=>`<b>${fmtDateOnly(d.date)}</b><br><span class="tk">${t("k_avg")}:</span> <b>${d.avg!=null?fmtHm(d.avg):"—"}</b><br>
+      <span class="tk">${t("th_count")}:</span> <b>${d.count}</b>`
+  });
+
+  vbars($("#chHist"), DATA.durations, {
+    value:d=>d.count, label:d=>d.label.split("–")[0], fmt:v=>Math.round(v), directLabels:true,
+    tipHtml:d=>`<b>${esc(d.label)}</b><br><span class="tk">${t("th_count")}:</span> <b>${d.count}</b>`
+  });
+
+  const DD = DATA.dryers.filter(d=>d.avg!=null);
+  const gAvg = DD.length ? Math.round(DD.reduce((a,b)=>a+b.avg,0)/DD.length) : 0;
+  vbars($("#chDryers"), DATA.dryers, {
+    value:d=>d.avg||0, label:d=>d.number, fmt:v=>fmtH(Math.round(v)), h:260,
+    refLine:gAvg, refLabel:`${t("th_avg")} ${fmtH(gAvg)}`,
+    tipHtml:d=>`<b>№${d.number}</b><br><span class="tk">${t("th_avg")}:</span> <b>${d.avg!=null?fmtHm(d.avg):"—"}</b><br>
+      <span class="tk">${t("th_delta")}:</span> <b>${d.vs_global!=null?(d.vs_global>0?"+":"")+d.vs_global+" "+t("minutes"):"—"}</b><br>
+      <span class="tk">${t("th_count")}:</span> <b>${d.batches}</b>`
+  });
+
+  vbars($("#chHours"), DATA.hours, {
+    value:d=>d.count, label:d=>d.hour, fmt:v=>Math.round(v), labelEvery:2,
+    tipHtml:d=>`<b>${String(d.hour).padStart(2,"0")}:00</b><br><span class="tk">${t("th_count")}:</span> <b>${d.count}</b>`
+  });
+
+  const defs = DATA.dryers.filter(d=>d.defects>0).sort((a,b)=>b.defects-a.defects).slice(0,12);
+  if(defs.length){
+    hbars($("#chDefects"), defs, {
+      value:d=>d.defects, label:d=>"№"+d.number, color:"--critical", fmt:v=>Math.round(v),
+      tipHtml:d=>`<b>№${d.number}</b><br><span class="tk">${t("th_def")}:</span> <b>${d.defects}</b>` +
+                 (d.defect_rate!=null?`<br><span class="tk">%:</span> <b>${d.defect_rate}%</b>`:"")
+    });
+  } else {
+    $("#chDefects").innerHTML = `<p class="empty">✓ ${LANG==="ru"?"Брака за период не зафиксировано.":"Davr davomida brak qayd etilmagan."}</p>`;
+  }
+
+  const M = DATA.matrix;
+  const cellMap = new Map(M.cells.map(c=>[c.product+"|"+c.dryer, c]));
+  const usedDryers = M.dryers.filter(d=>M.cells.some(c=>c.dryer===d));
+  heatmap($("#chMatrix"), {
+    rows:M.products, cols:usedDryers,
+    get:(p,d)=> cellMap.get(p+"|"+d)?.avg ?? null,
+    fmt:v=>fmtH(Math.round(v)),
+    tipHtml:(p,d,v)=> v==null ? `<b>${esc(p)} · №${d}</b><br><span class="tk">${t("none")}</span>`
+      : `<b>${esc(p)} · №${d}</b><br><span class="tk">${t("th_avg")}:</span> <b>${fmtHm(v)}</b><br>
+         <span class="tk">${t("th_count")}:</span> <b>${cellMap.get(p+"|"+d).count}</b>`
+  });
+}
+const fmtDateOnly = iso => new Date(iso+"T12:00:00").toLocaleDateString(LANG==="ru"?"ru-RU":"uz-UZ",
+  {day:"2-digit",month:"short"});
+
+/* ------------------------------------------------------------------ tables */
+function qualityPill(q){
+  const map = {ok:["--good","✓"], defect:["--critical","⚠"], unknown:["--ink-muted","·"]};
+  const [c,i] = map[q]||map.unknown;
+  return `<span class="pill" style="color:${css(c)}">${i} ${esc(t("q_"+q))}</span>`;
+}
+
+function renderTables(){
+  const o = DATA.outliers;
+  $("#tblOutliers").innerHTML = o.length ? `<table><thead><tr>
+    <th>${t("th_dryer")}</th><th>${t("th_product")}</th><th>${t("th_dur")}</th><th>${t("th_delta")}</th><th>${t("th_fin")}</th>
+    </tr></thead><tbody>${o.map(r=>`<tr><td>№${r.dryer??"—"}</td><td>${esc(r.product||"—")}</td>
+      <td>${fmtH(r.duration)}</td>
+      <td style="color:${css(Math.abs(r.delta)>120?"--critical":"--ink-2")}">${r.delta>0?"+":""}${r.delta} ${t("minutes")}</td>
+      <td class="muted">${fmtDate(r.finished_at)}</td></tr>`).join("")}</tbody></table>`
+    : `<p class="empty">${t("none")}</p>`;
+
+  const ops = DATA.operators;
+  $("#tblOps").innerHTML = ops.length ? `<table><thead><tr>
+    <th>${t("th_op")}</th><th>${t("th_count")}</th><th>${t("th_dryer")}</th><th>${t("th_def")}</th><th>${t("th_last")}</th>
+    </tr></thead><tbody>${ops.map(r=>`<tr><td>${esc(r.name)}</td><td>${r.count}</td>
+      <td>${r.dryers}</td><td>${r.defects}</td><td class="muted">${fmtDate(r.last)}</td></tr>`).join("")}</tbody></table>`
+    : `<p class="empty">${t("none")}</p>`;
+
+  const dsel = $("#fDryer"), psel = $("#fProduct");
+  if(dsel.options.length<=1){
+    DATA.dryers.forEach(d=>dsel.append(new Option("№"+d.number, d.number)));
+  }
+  psel.innerHTML = `<option value="">${LANG==="ru"?"Все продукты":"Barcha mahsulotlar"}</option>`;
+  DATA.products.forEach(p=>psel.append(new Option(p.product, p.product)));
+  renderAll();
+}
+
+function renderAll(){
+  const q = ($("#fSearch").value||"").toLowerCase().trim();
+  const fd = $("#fDryer").value, fp = $("#fProduct").value, fq = $("#fQuality").value;
+  const fr = $("#fReview").checked;
+  const rows = DATA.recent.filter(r=>{
+    if(fd && String(r.dryer)!==fd) return false;
+    if(fp && r.product!==fp) return false;
+    if(fq && r.quality!==fq) return false;
+    if(fr && !r.needs_review) return false;
+    if(q && !`${r.product||""} ${r.operator||""} ${r.note||""} ${r.raw_text||""}`.toLowerCase().includes(q)) return false;
+    return true;
+  });
+  $("#tblCount").textContent = `${rows.length} ${t("batches")}`;
+  $("#tblAll").innerHTML = rows.length ? `<table><thead><tr>
+      <th>${t("th_dryer")}</th><th>${t("th_product")}</th><th>${t("th_dur")}</th><th>${t("th_fin")}</th>
+      <th>${t("th_t")}</th><th>${t("th_h")}</th><th>${t("th_q")}</th><th>${t("th_op")}</th><th>${t("th_note")}</th>
+    </tr></thead><tbody>${rows.map(r=>`<tr data-id="${r.id}" style="cursor:pointer">
+      <td><b>${r.dryer!=null?"№"+r.dryer:'<span class="muted">?</span>'}</b></td>
+      <td>${esc(r.product||"—")}</td><td>${fmtH(r.duration)}</td>
+      <td class="muted">${fmtDate(r.finished_at)}</td>
+      <td>${r.temperature??"—"}</td><td>${r.humidity??"—"}</td>
+      <td>${qualityPill(r.quality)}</td><td>${esc(r.operator||"—")}</td>
+      <td class="muted">${esc((r.note||"").slice(0,40))}${r.needs_review?' <span class="pill" style="color:'+css("--warning")+'">⚠</span>':""}</td>
+    </tr>`).join("")}</tbody></table>` : `<p class="empty">${t("none")}</p>`;
+  $("#tblAll").querySelectorAll("tr[data-id]").forEach(tr=>
+    tr.addEventListener("click", ()=>openBatch(+tr.dataset.id)));
+}
+
+/* ------------------------------------------------------------------ dialogs */
+function openDryer(n){
+  const d = DATA.dryers.find(x=>x.number===n);
+  const rows = DATA.recent.filter(r=>r.dryer===n).slice(0,40);
+  $("#dlgTitle").textContent = `${t("th_dryer")} №${n}`;
+  $("#dlgBody").innerHTML = `
+    <div class="kpis" style="grid-template-columns:repeat(auto-fit,minmax(120px,1fr))">
+      ${tile(t("th_count"), d.batches, "")}
+      ${tile(t("th_avg"), d.avg!=null?fmtHm(d.avg):"—", `min ${fmtH(d.min)} · max ${fmtH(d.max)}`)}
+      ${tile(t("th_def"), d.defects, d.defect_rate!=null?d.defect_rate+"%":"")}
+    </div>
+    <div style="margin-top:14px">${rows.length?`<table><thead><tr>
+      <th>${t("th_product")}</th><th>${t("th_dur")}</th><th>${t("th_fin")}</th><th>${t("th_q")}</th><th>${t("th_op")}</th>
+      </tr></thead><tbody>${rows.map(r=>`<tr><td>${esc(r.product||"—")}</td><td>${fmtH(r.duration)}</td>
+      <td class="muted">${fmtDate(r.finished_at)}</td><td>${qualityPill(r.quality)}</td>
+      <td>${esc(r.operator||"—")}</td></tr>`).join("")}</tbody></table>`:`<p class="empty">${t("none")}</p>`}</div>`;
+  $("#dlg").showModal();
+}
+
+function openBatch(id){
+  const r = DATA.recent.find(x=>x.id===id); if(!r) return;
+  $("#dlgTitle").textContent = `#${r.id} · ${r.dryer!=null?"№"+r.dryer:"?"} · ${r.product||"—"}`;
+  $("#dlgBody").innerHTML = `
+    <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px">
+      <label>${t("th_dryer")}<input id="eD" type="number" min="1" max="99" value="${r.dryer??""}" style="width:100%;margin-top:4px;padding:8px;border-radius:8px;border:1px solid var(--border);background:var(--plane);color:var(--ink-1)"></label>
+      <label>${t("th_product")}<input id="eP" value="${esc(r.product||"")}" style="width:100%;margin-top:4px;padding:8px;border-radius:8px;border:1px solid var(--border);background:var(--plane);color:var(--ink-1)"></label>
+      <label>${t("th_dur")} (${t("minutes")})<input id="eM" type="number" value="${r.duration??""}" style="width:100%;margin-top:4px;padding:8px;border-radius:8px;border:1px solid var(--border);background:var(--plane);color:var(--ink-1)"></label>
+      <label>${t("th_q")}<select id="eQ" style="width:100%;margin-top:4px;padding:8px;border-radius:8px;border:1px solid var(--border);background:var(--plane);color:var(--ink-1)">
+        ${["ok","defect","unknown"].map(q=>`<option value="${q}"${r.quality===q?" selected":""}>${t("q_"+q)}</option>`).join("")}
+      </select></label>
+    </div>
+    <p class="muted" style="margin-top:12px;font-size:12.5px">
+      ${t("th_fin")}: ${fmtDate(r.finished_at)} · ${t("th_op")}: ${esc(r.operator||"—")}<br>
+      ${t("th_t")}: ${r.temperature??"—"} · ${t("th_h")}: ${r.humidity??"—"} · ${t("conf")}: ${Math.round((r.confidence||0)*100)}%</p>
+    <p style="background:var(--plane);padding:10px;border-radius:8px;font-size:13px;margin-top:8px">
+      <span class="muted">${t("raw")}:</span><br>${esc(r.raw_text||"—")}</p>
+    <div style="display:flex;gap:8px;margin-top:14px">
+      <button class="btn primary" id="eSave">${t("save")}</button>
+      <button class="btn" id="eDel" style="color:${css("--critical")}">${t("del")}</button>
+    </div>`;
+  $("#eSave").onclick = async ()=>{
+    await fetch(`/api/batches/${id}`,{method:"PATCH",headers:{"Content-Type":"application/json"},
+      body:JSON.stringify({dryer_number:+$("#eD").value||null, product:$("#eP").value||null,
+        duration_minutes:+$("#eM").value||null, quality:$("#eQ").value})});
+    $("#dlg").close(); load();
+  };
+  $("#eDel").onclick = async ()=>{
+    await fetch(`/api/batches/${id}`,{method:"DELETE"}); $("#dlg").close(); load();
+  };
+  $("#dlg").showModal();
+}
+
+/* ------------------------------------------------------------------ wiring */
+$("#period").addEventListener("click", e=>{
+  const b = e.target.closest("button[data-days]"); if(!b) return;
+  DAYS = +b.dataset.days; localStorage.setItem("days", DAYS);
+  [...$("#period").children].forEach(x=>x.setAttribute("aria-pressed", x===b));
+  load();
+});
+$("#refreshBtn").onclick = load;
+$("#langBtn").onclick = ()=>{ LANG = LANG==="ru"?"uz":"ru"; localStorage.setItem("lang",LANG); render(); };
+$("#themeBtn").onclick = ()=>{
+  const cur = document.documentElement.dataset.theme;
+  const next = cur==="dark" ? "light" : cur==="light" ? "" : "dark";
+  document.documentElement.dataset.theme = next; localStorage.setItem("theme", next);
+  if(DATA) render();
+};
+["fSearch","fDryer","fProduct","fQuality","fReview"].forEach(id=>{
+  const n = document.getElementById(id);
+  n.addEventListener(id==="fSearch"?"input":"change", renderAll);
+});
+addEventListener("resize", ()=>{ clearTimeout(window._rz); window._rz=setTimeout(()=>DATA&&renderCharts(),160); });
+
+document.documentElement.dataset.theme = localStorage.getItem("theme") || "";
+[...$("#period").children].forEach(b=>b.setAttribute("aria-pressed", +b.dataset.days===DAYS));
+load();
+setInterval(load, 120000);
+</script>
+</body>
+</html>

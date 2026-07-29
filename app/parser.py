@@ -229,57 +229,72 @@ def _to_float(s: str | None) -> float | None:
         return None
 
 
-def map_display(l1: str | None, l2: str | None, l3: str | None) -> tuple[str | None, float | None, float | None]:
-    """Строки табло -> (таймер, температура, влажность). Эвристика: число с точкой = температура."""
-    lines = [x for x in (l1, l2, l3) if x]
-    timer = None
-    nums: list[tuple[str, float]] = []
-    for raw in lines:
-        s = str(raw).strip()
-        if re.fullmatch(r"\d{1,2}\s*[:.]\s*\d{2}", s) and ":" in s:
-            timer = s.replace(" ", "")
-            continue
-        v = _to_float(s)
-        if v is not None:
-            nums.append((s, v))
-    if timer is None and nums:
-        # первая строка часто таймер вида 0722
-        s, v = nums[0]
-        if re.fullmatch(r"\d{4}", s.replace(":", "")):
-            timer = f"{s[:2]}:{s[2:]}"
-            nums = nums[1:]
-    temp = hum = None
-    frac = lambda x: ("." in x or "," in x)
+def _digits(raw) -> str:
+    return re.sub(r"\D", "", str(raw or ""))
 
-    def as_temp(raw: str) -> float | None:
-        """Табло МПР показывает температуру как XX.X — три-четыре разряда с одной
-        десятичной. Точку модели путают ('8.19', '564' вместо 81.9 и 56.4),
-        поэтому считаем по цифрам, а не по тому, где увидели точку."""
-        digits = re.sub(r"\D", "", raw)
-        if len(digits) in (3, 4):
-            cand = int(digits) / 10
-            if 20 <= cand <= 130:
-                return round(cand, 1)
-        return None
 
-    # температура: восстанавливаем из цифр строки с десятичной точкой
-    for s, v in nums:
-        if temp is None and frac(s):
-            temp = as_temp(s)
-    # запасной вариант: строка без точки, но по цифрам похожа на температуру
+def _as_timer(raw) -> str | None:
+    """Строка 1 табло — ВРЕМЯ вида 07.22 / 0722 -> '07:22'."""
+    d = _digits(raw)
+    if len(d) == 4 and int(d[:2]) <= 47 and int(d[2:]) <= 59:
+        return f"{d[:2]}:{d[2:]}"
+    if len(d) == 3 and int(d[1:]) <= 59:
+        return f"0{d[0]}:{d[1:]}"
+    return None
+
+
+def _as_temp(raw) -> float | None:
+    """Строка 2 — ТЕМПЕРАТУРА, всегда XX.X. Модели теряют десятичную точку
+    ('8.19', '564' вместо 81.9 и 56.4), поэтому считаем по цифрам."""
+    d = _digits(raw)
+    if len(d) in (3, 4):
+        v = int(d) / 10
+        if 20 <= v <= 130:
+            return round(v, 1)
+    return None
+
+
+def _as_hum(raw) -> int | None:
+    """Строка 3 — ВЛАЖНОСТЬ, целое 0..100."""
+    d = _digits(raw)
+    if 1 <= len(d) <= 3 and "." not in str(raw) and "," not in str(raw):
+        v = int(d)
+        if 0 <= v <= 100:
+            return v
+    return None
+
+
+def map_display(l1, l2, l3) -> tuple[str | None, float | None, int | None]:
+    """Строки табло МПР-49 -> (таймер, температура, влажность).
+
+    Порядок строк на контроллере фиксированный (ВРЕМЯ / ТЕМПЕР / ВЛАЖН),
+    поэтому доверяем позиции, а эвристику включаем только для пустых слотов.
+    """
+    timer = _as_timer(l1)
+    temp = _as_temp(l2)
+    hum = _as_hum(l3)
+
+    used = {0: timer is not None, 1: temp is not None, 2: hum is not None}
+    lines = [l1, l2, l3]
+
+    # если строка не распозналась — ищем подходящее значение в оставшихся
     if temp is None:
-        for s, v in nums:
-            if not frac(s) and len(re.sub(r"\D", "", s)) == 3 and not (0 <= v <= 100):
-                temp = as_temp(s)
-                if temp is not None:
-                    break
-    # влажность: только целое 0..100 (дробное здесь — почти всегда ошибка чтения)
-    for s, v in nums:
-        if hum is None and v != temp and not frac(s) and 0 <= v <= 100:
-            hum = round(v)
-    # единственное целое выше 40 без температуры — скорее температура, чем влажность
-    if temp is None and hum is not None and hum > 40 and len(nums) == 1:
-        temp, hum = float(hum), None
+        for i, raw in enumerate(lines):
+            if not used.get(i) and raw and _as_temp(raw) is not None:
+                temp = _as_temp(raw)
+                used[i] = True
+                break
+    if hum is None:
+        for i, raw in enumerate(lines):
+            if not used.get(i) and raw and _as_hum(raw) is not None:
+                hum = _as_hum(raw)
+                used[i] = True
+                break
+    if timer is None:
+        for i, raw in enumerate(lines):
+            if not used.get(i) and raw and _as_timer(raw) is not None:
+                timer = _as_timer(raw)
+                break
     return timer, temp, hum
 
 

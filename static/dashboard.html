@@ -59,16 +59,22 @@ h1 img{width:32px;height:32px;border-radius:50%;flex:none;background:#fff}
 h1 .name{display:flex;flex-direction:column;line-height:1.15;min-width:0}
 h1 .sub{font-weight:400;color:var(--gold);font-size:11.5px;letter-spacing:.01em}
 .spacer{flex:1}
+/* базовая кнопка — для контента (диалоги, формы) */
+.btn{border:1px solid var(--border);background:var(--surface-1);color:var(--ink-1);
+  padding:7px 12px;border-radius:10px;font:inherit;font-size:13px;cursor:pointer;text-decoration:none;
+  display:inline-flex;gap:6px;align-items:center;-webkit-tap-highlight-color:transparent}
+.btn:hover{background:var(--grid)}
+.btn.primary{background:var(--s1);border-color:var(--s1);color:#fff;font-weight:640}
+
+/* фирменный вариант — только внутри тёмной шапки */
+header.top .btn{border-color:rgba(255,255,255,.24);background:rgba(255,255,255,.08);color:var(--brand-ink)}
+header.top .btn:hover{background:rgba(255,255,255,.18)}
+header.top .btn.primary{background:var(--gold);border-color:var(--gold);color:var(--brand);font-weight:680}
 .seg{display:flex;background:rgba(255,255,255,.10);border:1px solid rgba(255,255,255,.20);
      border-radius:10px;overflow:hidden}
 .seg button{border:0;background:transparent;color:rgba(255,255,255,.82);padding:7px 12px;font:inherit;
      font-size:13px;cursor:pointer}
 .seg button[aria-pressed="true"]{background:var(--gold);color:var(--brand);font-weight:680}
-.btn{border:1px solid rgba(255,255,255,.24);background:rgba(255,255,255,.08);color:var(--brand-ink);
-  padding:7px 12px;border-radius:10px;font:inherit;font-size:13px;cursor:pointer;text-decoration:none;
-  display:inline-flex;gap:6px;align-items:center;-webkit-tap-highlight-color:transparent}
-.btn:hover{background:rgba(255,255,255,.18)}
-.btn.primary{background:var(--gold);border-color:var(--gold);color:var(--brand);font-weight:680}
 
 section{margin:22px 0;min-width:0}
 h2{font-size:14px;font-weight:650;margin:0 0 4px;letter-spacing:.01em}
@@ -182,7 +188,15 @@ tr:hover td{background:var(--plane)}
 dialog{border:1px solid var(--border);border-radius:var(--radius);background:var(--surface-1);color:var(--ink-1);
   padding:0;max-width:min(560px,92vw);width:100%}
 dialog::backdrop{background:rgba(0,0,0,.45)}
-.dlg-h{padding:14px 18px;border-bottom:1px solid var(--border);display:flex;align-items:center;gap:10px}
+.dlg-h{padding:14px 18px;border-bottom:1px solid var(--border);display:flex;align-items:center;gap:10px;
+  position:sticky;top:0;background:var(--surface-1);z-index:2;border-radius:inherit}
+.dlg-x{width:38px;height:38px;padding:0;justify-content:center;font-size:17px;line-height:1;flex:none;
+  border-radius:10px;background:var(--plane)}
+.dlg-close{display:none}
+@media (max-width:760px){
+  .dlg-close{display:flex;width:100%;height:48px;margin-top:14px;justify-content:center;font-size:15px;
+    font-weight:640;background:var(--plane)}
+}
 .dlg-b{padding:16px 18px;max-height:64vh;overflow:auto}
 .controls{display:flex;gap:8px;align-items:center;flex-wrap:wrap}
 
@@ -199,7 +213,7 @@ dialog::backdrop{background:rgba(0,0,0,.45)}
   h1{font-size:14.5px;gap:7px;min-width:0}
   h1 img{width:28px;height:28px}
   h1 .sub{font-size:10.5px}
-  .spacer{display:none}
+  header.top .spacer{display:none}
   /* строка 1: заголовок + кнопки, строка 2: период на всю ширину */
   .top-in{flex-wrap:wrap}
   .controls{flex:1;justify-content:flex-end;flex-wrap:wrap;row-gap:8px}
@@ -282,17 +296,13 @@ dialog::backdrop{background:rgba(0,0,0,.45)}
   <div id="error"></div>
 
   <section>
-    <div class="hero" id="hero"></div>
+    <div class="kpis" id="kpis"></div>
   </section>
 
   <section>
     <h2 data-i="rank_h">Сколько сушит каждый аппарат</h2>
     <p class="hint" data-i="rank_hint">Отсортировано от самых медленных к самым быстрым. Пунктир — среднее по цеху; всё, что правее него, сушит дольше остальных.</p>
     <div class="card wide" style="padding:16px 18px 14px"><div id="rank"></div></div>
-  </section>
-
-  <section>
-    <div class="kpis" id="kpis"></div>
   </section>
 
   <section>
@@ -309,6 +319,12 @@ dialog::backdrop{background:rgba(0,0,0,.45)}
     </div>
     <div class="legend" id="dryLegend"></div>
     <div class="grid31" id="dryers" style="margin-top:10px"></div>
+  </section>
+
+  <section>
+    <h2 data-i="hero_title">Сколько времени аппарат сушит партию</h2>
+    <p class="hint" data-i="hero_hint">Сводка по цеху: кто быстрее, кто медленнее и насколько.</p>
+    <div class="hero" id="hero"></div>
   </section>
 
   <section>
@@ -379,8 +395,8 @@ dialog::backdrop{background:rgba(0,0,0,.45)}
 <div id="tip" role="tooltip"></div>
 
 <dialog id="dlg">
-  <div class="dlg-h"><b id="dlgTitle"></b><div class="spacer" style="flex:1"></div>
-    <button class="btn" onclick="document.getElementById('dlg').close()">✕</button></div>
+  <div class="dlg-h"><b id="dlgTitle"></b><div style="flex:1"></div>
+    <button class="btn dlg-x" id="dlgX" aria-label="Закрыть">✕</button></div>
   <div class="dlg-b" id="dlgBody"></div>
 </dialog>
 
@@ -392,6 +408,7 @@ const I18N = {
     hero_title:"Сколько времени аппарат сушит партию",
     hero_avg:"в среднем по цеху", hero_none:"Пока нет ни одной завершённой партии — как только в группу придёт первый отчёт, здесь появятся цифры.",
     hero_fast:"Быстрее всех", hero_slow:"Медленнее всех", hero_spread:"Разброс по цеху", hero_norm:"Норма",
+    hero_hint:"Сводка по цеху: кто быстрее, кто медленнее и насколько.",
     rank_h:"Сколько сушит каждый аппарат",
     rank_hint:"Отсортировано от самых медленных к самым быстрым. Пунктир — среднее по цеху; всё, что правее него, сушит дольше остальных.",
     rank_avgline:"среднее по цеху",
@@ -424,7 +441,7 @@ const I18N = {
     q_ok:"норма", q_defect:"брак", q_unknown:"—",
     none:"Нет данных за выбранный период.",
     batches:"партий", hours:"ч", minutes:"мин", of:"из", save:"Сохранить", del:"Удалить",
-    conf:"Уверенность распознавания", raw:"Исходное сообщение", review:"проверить",
+    close:"Закрыть", conf:"Уверенность распознавания", raw:"Исходное сообщение", review:"проверить",
     updated:"Обновлено", period:"Период", tz:"Часовой пояс",
   },
   uz:{
@@ -432,6 +449,7 @@ const I18N = {
     hero_title:"Bir partiyani qancha vaqtda quritadi",
     hero_avg:"sex bo'yicha o'rtacha", hero_none:"Hali bitta ham tugagan partiya yo'q — guruhga birinchi hisobot kelishi bilan raqamlar paydo bo'ladi.",
     hero_fast:"Eng tez", hero_slow:"Eng sekin", hero_spread:"Sex bo'yicha tarqalish", hero_norm:"Me'yor",
+    hero_hint:"Sex bo'yicha xulosa: kim tezroq, kim sekinroq va qancha farq bilan.",
     rank_h:"Har bir sushka qancha quritadi",
     rank_hint:"Eng sekinlaridan tezlariga qarab tartiblangan. Punktir — sex o'rtachasi; undan o'ngdagilar boshqalardan uzoqroq quritadi.",
     rank_avgline:"sex o'rtachasi",
@@ -464,7 +482,7 @@ const I18N = {
     q_ok:"me'yor", q_defect:"brak", q_unknown:"—",
     none:"Tanlangan davr uchun ma'lumot yo'q.",
     batches:"partiya", hours:"s", minutes:"min", of:"/", save:"Saqlash", del:"O'chirish",
-    conf:"Tanib olish ishonchi", raw:"Asl xabar", review:"tekshirish",
+    close:"Yopish", conf:"Tanib olish ishonchi", raw:"Asl xabar", review:"tekshirish",
     updated:"Yangilandi", period:"Davr", tz:"Vaqt mintaqasi",
   }
 };
@@ -765,6 +783,8 @@ function render(){
   const k = DATA.kpi;
   $("#kpis").innerHTML = [
     tile(t("k_today"), k.batches_today, `${t("k_total")}: ${k.batches_total}`),
+    tile(t("k_avg"), k.avg_duration!=null ? fmtHm(k.avg_duration) : "—",
+         `${t("k_med")}: ${k.median_duration!=null?fmtHm(k.median_duration):"—"}`),
     tile(t("k_def"), k.defect_rate!=null ? k.defect_rate+"%" : "—", `${k.defects} ${t("of")} ${k.graded}`,
          k.defect_rate!=null && k.defect_rate>5 ? "--critical" : null),
     tile(t("k_util"), k.utilization+"%", `${DATA.days} ${LANG==="ru"?"дн.":"kun"} × ${k.dryer_count}`),
@@ -786,7 +806,7 @@ function renderHero(){
   const k = DATA.kpi, N = DATA.norm || {};
   const box = $("#hero");
   if (!withAvg.length){
-    box.innerHTML = `<div><p class="big">${esc(t("hero_title"))}</p>
+    box.innerHTML = `<div><p class="big">${esc(t("hero_avg"))}</p>
       <div class="num">—</div></div><p class="say">${esc(t("hero_none"))}</p>`;
     return;
   }
@@ -810,9 +830,9 @@ function renderHero(){
 
   box.innerHTML = `
     <div>
-      <p class="big">${esc(t("hero_title"))}</p>
+      <p class="big">${esc(t("hero_avg"))}</p>
       <div class="num">${fmtHm(avg).replace(/(\d+)(\D+)/g,'$1<span>$2</span>')}</div>
-      <div class="under">${esc(t("hero_avg"))} · ${esc(t("k_med"))} ${fmtHm(k.median_duration)}</div>
+      <div class="under">${esc(t("k_med"))} ${fmtHm(k.median_duration)}</div>
     </div>
     <div>
       <p class="say">${say}</p>
@@ -1078,7 +1098,8 @@ function openDryer(n){
       <th>${t("th_product")}</th><th>${t("th_dur")}</th><th>${t("th_fin")}</th><th>${t("th_q")}</th><th>${t("th_op")}</th>
       </tr></thead><tbody>${rows.map(r=>`<tr><td>${esc(r.product||"—")}</td><td>${fmtH(r.duration)}</td>
       <td class="muted">${fmtDate(r.finished_at)}</td><td>${qualityPill(r.quality)}</td>
-      <td>${esc(r.operator||"—")}</td></tr>`).join("")}</tbody></table>`:`<p class="empty">${t("none")}</p>`}</div>`;
+      <td>${esc(r.operator||"—")}</td></tr>`).join("")}</tbody></table>`:`<p class="empty">${t("none")}</p>`}</div>
+    <button class="btn dlg-close" onclick="document.getElementById('dlg').close()">${t("close")}</button>`;
   $("#dlg").showModal();
 }
 
@@ -1102,7 +1123,8 @@ function openBatch(id){
     <div style="display:flex;gap:8px;margin-top:14px">
       <button class="btn primary" id="eSave">${t("save")}</button>
       <button class="btn" id="eDel" style="color:${css("--critical")}">${t("del")}</button>
-    </div>`;
+    </div>
+    <button class="btn dlg-close" onclick="document.getElementById('dlg').close()">${t("close")}</button>`;
   $("#eSave").onclick = async ()=>{
     await fetch(`/api/batches/${id}`,{method:"PATCH",headers:{"Content-Type":"application/json"},
       body:JSON.stringify({dryer_number:+$("#eD").value||null, product:$("#eP").value||null,
@@ -1122,6 +1144,10 @@ $("#period").addEventListener("click", e=>{
   [...$("#period").children].forEach(x=>x.setAttribute("aria-pressed", x===b));
   load();
 });
+const dlg = $("#dlg");
+$("#dlgX").onclick = () => dlg.close();
+dlg.addEventListener("click", e => { if (e.target === dlg) dlg.close(); });  // тап по фону закрывает
+
 $("#refreshBtn").onclick = load;
 $("#drySort").addEventListener("change", ()=>{ localStorage.setItem("drySort", $("#drySort").value); renderDryers(); });
 $("#drySort").value = localStorage.getItem("drySort") || "num";

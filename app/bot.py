@@ -286,6 +286,38 @@ async def on_report_message(msg: Message, bot: Bot):
             )
         return
 
+    # защита от двойного учёта: тот же отчёт из группы и из лички
+    if parsed.dryer_number and parsed.duration_minutes:
+        async with session() as s:
+            dup = (await s.execute(
+                select(Batch).where(
+                    Batch.dryer_number == parsed.dryer_number,
+                    Batch.product == parsed.product,
+                    Batch.duration_minutes == parsed.duration_minutes,
+                    Batch.finished_at >= sent_at - dt.timedelta(minutes=config.DUP_WINDOW_MINUTES),
+                ).order_by(Batch.id.desc()).limit(1)
+            )).scalar_one_or_none()
+            if dup:
+                r = await s.get(RawMessage, raw_id)
+                if r:
+                    r.processed = True
+                    r.batch_id = dup.id
+                    r.parse_error = "дубль"
+                    await s.commit()
+        if dup:
+            log.info("дубль отчёта: сушка %s, %s мин", parsed.dryer_number, parsed.duration_minutes)
+            if private:
+                await msg.answer(
+                    f"ℹ️ Bu partiya allaqachon yozilgan (sushka №{parsed.dryer_number}, "
+                    f"{_fmt_dur(parsed.duration_minutes)}) — ikki marta hisoblamadim."
+                )
+            else:
+                try:
+                    await msg.react([ReactionTypeEmoji(emoji="👌")])
+                except Exception:  # noqa: BLE001
+                    pass
+            return
+
     started = None
     if parsed.duration_minutes:
         started = sent_at - dt.timedelta(minutes=parsed.duration_minutes)

@@ -249,13 +249,18 @@ def map_display(l1: str | None, l2: str | None, l3: str | None) -> tuple[str | N
             timer = f"{s[:2]}:{s[2:]}"
             nums = nums[1:]
     temp = hum = None
+    frac = lambda x: ("." in x or "," in x)
+    # температура: только значение с десятичной точкой в рабочем диапазоне
     for s, v in nums:
-        if ("." in s or "," in s) and temp is None and 20 <= v <= 120:
+        if temp is None and frac(s) and 20 <= v <= 120:
             temp = v
-        elif hum is None and 0 <= v <= 100:
-            hum = v
+    # влажность: только целое 0..100 (дробное здесь — почти всегда ошибка чтения)
+    for s, v in nums:
+        if hum is None and v != temp and not frac(s) and 0 <= v <= 100:
+            hum = round(v)
+    # единственное целое выше 40 без температуры — скорее температура, чем влажность
     if temp is None and hum is not None and hum > 40 and len(nums) == 1:
-        temp, hum = hum, None
+        temp, hum = float(hum), None
     return timer, temp, hum
 
 

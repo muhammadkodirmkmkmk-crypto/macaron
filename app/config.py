@@ -73,6 +73,10 @@ NORM_MAX_MINUTES = _int("NORM_MAX_MINUTES", 16 * 60)
 # Через сколько часов без сообщения считаем сушку «молчащей»
 STALE_HOURS = _int("STALE_HOURS", 24)
 
+# Одинаковый отчёт (та же сушка, продукт, время) в пределах этого окна — дубль.
+# Защита от двойного учёта, когда оператор пишет и в группу, и боту в личку.
+DUP_WINDOW_MINUTES = _int("DUP_WINDOW_MINUTES", 20)
+
 # ---------- База данных ----------
 _raw_db = os.getenv("DATABASE_URL", "").strip()
 if _raw_db.startswith("postgres://"):

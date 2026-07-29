@@ -74,6 +74,48 @@ section{margin:22px 0;min-width:0}
 h2{font-size:14px;font-weight:650;margin:0 0 4px;letter-spacing:.01em}
 .hint{color:var(--ink-muted);font-size:12.5px;margin:0 0 12px}
 
+/* ---- главный блок: сколько сушат аппараты ---- */
+.hero{background:var(--surface-1);border:1px solid var(--border);border-radius:var(--radius);
+  padding:20px 22px;display:grid;grid-template-columns:minmax(210px,auto) 1fr;gap:22px;align-items:start}
+.hero .big{font-size:15px;color:var(--ink-2);font-weight:600;margin:0 0 6px}
+.hero .num{font-size:52px;font-weight:680;letter-spacing:-.035em;line-height:1;color:var(--ink-1)}
+.hero .num span{font-size:22px;font-weight:500;color:var(--ink-2);letter-spacing:0}
+.hero .under{font-size:12.5px;color:var(--ink-muted);margin-top:8px}
+.hero .say{font-size:15px;line-height:1.55;color:var(--ink-1);margin:0}
+.hero .say b{font-weight:660}
+.hero .say .slow{color:var(--critical);font-weight:660;white-space:nowrap}
+.hero .say .fast{color:var(--success-text);font-weight:660;white-space:nowrap}
+.hero .pair{display:flex;gap:10px;flex-wrap:wrap;margin-top:14px}
+.hero .pair div{background:var(--plane);border:1px solid var(--border);border-radius:10px;
+  padding:9px 12px;font-size:12.5px;color:var(--ink-2)}
+.hero .pair b{display:block;font-size:17px;color:var(--ink-1);font-weight:660;margin-top:2px;
+  font-variant-numeric:tabular-nums}
+
+/* ---- рейтинг сушек по времени ---- */
+.rank{display:flex;flex-direction:column;gap:2px;position:relative;padding-top:18px}
+.rrow{display:grid;grid-template-columns:52px 1fr 72px 82px;gap:10px;align-items:center;
+  padding:5px 0;border-radius:8px}
+.rrow:hover{background:var(--plane)}
+.rnum{font-weight:660;font-size:13px;color:var(--ink-1);font-variant-numeric:tabular-nums}
+.rbar{height:16px;background:var(--grid);border-radius:4px;overflow:hidden;position:relative}
+.rbar i{display:block;height:100%;border-radius:4px;background:var(--s1)}
+.rtime{font-size:14px;font-weight:660;text-align:right;font-variant-numeric:tabular-nums;color:var(--ink-1)}
+.rdelta{font-size:12.5px;font-variant-numeric:tabular-nums;color:var(--ink-muted)}
+.rdelta.up{color:var(--critical);font-weight:600}
+.rdelta.down{color:var(--success-text);font-weight:600}
+.rmark{position:absolute;top:0;bottom:0;width:0;border-left:2px dashed var(--axis);pointer-events:none}
+.rmark span{position:absolute;top:0;left:50%;transform:translateX(-50%);font-size:10.5px;
+  color:var(--ink-muted);white-space:nowrap;background:var(--surface-1);padding:0 4px}
+
+.sortbar{display:flex;gap:8px;align-items:center;flex-wrap:wrap;margin:0 0 10px}
+.sortbar select{background:var(--surface-1);border:1px solid var(--border);color:var(--ink-1);
+  border-radius:9px;padding:6px 10px;font:inherit;font-size:13px}
+
+.badge{font-size:10.5px;padding:1px 6px;border-radius:6px;font-weight:600;white-space:nowrap}
+.badge.ok{background:color-mix(in srgb,var(--good) 15%,transparent);color:var(--success-text)}
+.badge.slow{background:color-mix(in srgb,var(--critical) 14%,transparent);color:var(--critical)}
+.badge.fastb{background:color-mix(in srgb,var(--s1) 14%,transparent);color:var(--s1)}
+
 .kpis{display:grid;grid-template-columns:repeat(auto-fit,minmax(168px,1fr));gap:12px}
 .tile{background:var(--surface-1);border:1px solid var(--border);border-radius:var(--radius);padding:14px 16px}
 .tile .label{font-size:12px;color:var(--ink-2);margin-bottom:6px}
@@ -85,7 +127,11 @@ h2{font-size:14px;font-weight:650;margin:0 0 4px;letter-spacing:.01em}
 .dry{background:var(--surface-1);border:1px solid var(--border);border-radius:12px;padding:11px 12px;cursor:pointer;
      position:relative;transition:transform .08s ease}
 .dry:hover{transform:translateY(-1px);border-color:var(--axis)}
-.dry .n{font-size:19px;font-weight:660;letter-spacing:-.02em}
+.dry .n{font-size:13px;font-weight:660;color:var(--ink-2);display:flex;justify-content:space-between;
+  align-items:center;gap:6px}
+.dry .hero-t{font-size:26px;font-weight:680;letter-spacing:-.03em;line-height:1.05;margin:6px 0 1px;
+  font-variant-numeric:tabular-nums}
+.dry .hero-c{font-size:11.5px;color:var(--ink-muted)}
 .dry .st{display:inline-flex;align-items:center;gap:5px;font-size:11.5px;color:var(--ink-2);margin-top:2px}
 .dot{width:9px;height:9px;border-radius:50%;flex:none;box-shadow:0 0 0 2px var(--surface-1)}
 .dry .row{display:flex;justify-content:space-between;gap:6px;font-size:11.5px;color:var(--ink-2);margin-top:7px;align-items:baseline}
@@ -141,6 +187,11 @@ dialog::backdrop{background:rgba(0,0,0,.45)}
 .controls{display:flex;gap:8px;align-items:center;flex-wrap:wrap}
 
 /* ---------------- мобильные ---------------- */
+@media (max-width:900px){
+  .hero{grid-template-columns:1fr;gap:16px}
+  .hero .num{font-size:44px}
+  .rrow{grid-template-columns:46px 1fr 66px 74px;gap:8px}
+}
 @media (max-width:760px){
   body{padding-bottom:calc(28px + env(safe-area-inset-bottom))}
   .wrap{padding:12px 12px 0}
@@ -169,7 +220,8 @@ dialog::backdrop{background:rgba(0,0,0,.45)}
 
   .grid31{grid-template-columns:1fr 1fr;gap:8px}
   .dry{padding:10px}
-  .dry .n{font-size:17px}
+  .dry .n{font-size:12px}
+  .dry .hero-t{font-size:23px}
   .dry .st{font-size:11px}
   .dry .row{font-size:11px;margin-top:5px}
 
@@ -179,6 +231,12 @@ dialog::backdrop{background:rgba(0,0,0,.45)}
 
   .hint{font-size:12px}
   .hide-sm{display:none}
+  .hero{padding:16px}
+  .hero .num{font-size:40px}
+  .hero .say{font-size:14px}
+  .rrow{grid-template-columns:42px 1fr 60px 0;gap:8px}
+  .rdelta{display:none}
+  .rmark span{font-size:10px}
   th{font-size:10px;padding:6px;letter-spacing:0}
   td{padding:7px 6px;font-size:12.5px}
   .tbl-wrap{max-height:62vh;-webkit-overflow-scrolling:touch}
@@ -224,12 +282,31 @@ dialog::backdrop{background:rgba(0,0,0,.45)}
   <div id="error"></div>
 
   <section>
+    <div class="hero" id="hero"></div>
+  </section>
+
+  <section>
+    <h2 data-i="rank_h">Сколько сушит каждый аппарат</h2>
+    <p class="hint" data-i="rank_hint">Отсортировано от самых медленных к самым быстрым. Пунктир — среднее по цеху; всё, что правее него, сушит дольше остальных.</p>
+    <div class="card wide" style="padding:16px 18px 14px"><div id="rank"></div></div>
+  </section>
+
+  <section>
     <div class="kpis" id="kpis"></div>
   </section>
 
   <section>
     <h2 data-i="dryers_h">Сушки — текущее состояние</h2>
     <p class="hint" data-i="dryers_hint">Статус оценивается по времени с последнего отчёта относительно среднего цикла этой сушки. Нажмите на карточку — история партий.</p>
+    <div class="sortbar no-print">
+      <span class="muted" style="font-size:12.5px" data-i="sort_label">Порядок:</span>
+      <select id="drySort">
+        <option value="num" data-i="sort_num">по номеру</option>
+        <option value="slow" data-i="sort_slow">сначала самые медленные</option>
+        <option value="fast" data-i="sort_fast">сначала самые быстрые</option>
+        <option value="recent" data-i="sort_recent">сначала недавние</option>
+      </select>
+    </div>
     <div class="legend" id="dryLegend"></div>
     <div class="grid31" id="dryers" style="margin-top:10px"></div>
   </section>
@@ -251,10 +328,6 @@ dialog::backdrop{background:rgba(0,0,0,.45)}
       <div class="card"><h3 data-i="c_hist">Распределение времени сушки</h3>
         <p class="cap" data-i="c_hist_cap">Сколько партий попало в каждый часовой интервал.</p>
         <div id="chHist"></div></div>
-
-      <div class="card wide"><h3 data-i="c_dryer">Среднее время по каждой сушке</h3>
-        <p class="cap" data-i="c_dryer_cap">Пунктир — среднее по цеху. Столбцы выше пунктира сушат дольше остальных.</p>
-        <div id="chDryers"></div></div>
 
       <div class="card"><h3 data-i="c_hour">Когда выгружают партии</h3>
         <p class="cap" data-i="c_hour_cap">Количество выгрузок по часам суток.</p>
@@ -316,6 +389,17 @@ dialog::backdrop{background:rgba(0,0,0,.45)}
 const I18N = {
   ru:{
     subtitle:"сушильный цех",
+    hero_title:"Сколько времени аппарат сушит партию",
+    hero_avg:"в среднем по цеху", hero_none:"Пока нет ни одной завершённой партии — как только в группу придёт первый отчёт, здесь появятся цифры.",
+    hero_fast:"Быстрее всех", hero_slow:"Медленнее всех", hero_spread:"Разброс по цеху", hero_norm:"Норма",
+    rank_h:"Сколько сушит каждый аппарат",
+    rank_hint:"Отсортировано от самых медленных к самым быстрым. Пунктир — среднее по цеху; всё, что правее него, сушит дольше остальных.",
+    rank_avgline:"среднее по цеху",
+    sort_label:"Порядок:", sort_num:"по номеру", sort_slow:"сначала самые медленные",
+    sort_fast:"сначала самые быстрые", sort_recent:"сначала недавние",
+    b_ok:"в норме", b_slow:"дольше нормы", b_fast:"быстрее нормы",
+    few_data:"Данных пока мало — график появится, когда наберётся несколько дней.",
+    last_cycle:"последняя партия", no_reports:"отчётов ещё не было",
     k_today:"Партий сегодня", k_total:"Партий за период", k_avg:"Среднее время сушки",
     k_med:"Медиана", k_def:"Уровень брака", k_util:"Загрузка парка",
     k_active:"Сушек в работе", k_review:"Требуют проверки",
@@ -345,6 +429,17 @@ const I18N = {
   },
   uz:{
     subtitle:"quritish sexi",
+    hero_title:"Bir partiyani qancha vaqtda quritadi",
+    hero_avg:"sex bo'yicha o'rtacha", hero_none:"Hali bitta ham tugagan partiya yo'q — guruhga birinchi hisobot kelishi bilan raqamlar paydo bo'ladi.",
+    hero_fast:"Eng tez", hero_slow:"Eng sekin", hero_spread:"Sex bo'yicha tarqalish", hero_norm:"Me'yor",
+    rank_h:"Har bir sushka qancha quritadi",
+    rank_hint:"Eng sekinlaridan tezlariga qarab tartiblangan. Punktir — sex o'rtachasi; undan o'ngdagilar boshqalardan uzoqroq quritadi.",
+    rank_avgline:"sex o'rtachasi",
+    sort_label:"Tartib:", sort_num:"raqami bo'yicha", sort_slow:"eng sekinlari birinchi",
+    sort_fast:"eng tezlari birinchi", sort_recent:"yangilari birinchi",
+    b_ok:"me'yorda", b_slow:"me'yordan uzoq", b_fast:"me'yordan tez",
+    few_data:"Ma'lumot hali kam — bir necha kun yig'ilgach grafik paydo bo'ladi.",
+    last_cycle:"oxirgi partiya", no_reports:"hali hisobot bo'lmagan",
     k_today:"Bugungi partiyalar", k_total:"Davr partiyalari", k_avg:"O'rtacha sushish vaqti",
     k_med:"Mediana", k_def:"Brak darajasi", k_util:"Park yuklamasi",
     k_active:"Ishlayotgan sushkalar", k_review:"Tekshirish kerak",
@@ -664,10 +759,12 @@ function render(){
   $("#langBtn").textContent = LANG==="ru" ? "UZ" : "RU";
   $("#exportBtn").href = `/api/export.xlsx?days=${DAYS}`;
 
+  renderHero();
+  renderRank();
+
   const k = DATA.kpi;
   $("#kpis").innerHTML = [
     tile(t("k_today"), k.batches_today, `${t("k_total")}: ${k.batches_total}`),
-    tile(t("k_avg"), k.avg_duration!=null ? fmtHm(k.avg_duration) : "—", `${t("k_med")}: ${k.median_duration!=null?fmtHm(k.median_duration):"—"}`),
     tile(t("k_def"), k.defect_rate!=null ? k.defect_rate+"%" : "—", `${k.defects} ${t("of")} ${k.graded}`,
          k.defect_rate!=null && k.defect_rate>5 ? "--critical" : null),
     tile(t("k_util"), k.utilization+"%", `${DATA.days} ${LANG==="ru"?"дн.":"kun"} × ${k.dryer_count}`),
@@ -683,6 +780,103 @@ function render(){
     `${t("updated")}: ${fmtDate(DATA.generated_at)} · ${t("period")}: ${DATA.days} · ${t("tz")}: ${DATA.timezone}`;
 }
 
+/* ---- главный блок: время сушки крупно + объяснение словами ---- */
+function renderHero(){
+  const withAvg = DATA.dryers.filter(d => d.avg != null);
+  const k = DATA.kpi, N = DATA.norm || {};
+  const box = $("#hero");
+  if (!withAvg.length){
+    box.innerHTML = `<div><p class="big">${esc(t("hero_title"))}</p>
+      <div class="num">—</div></div><p class="say">${esc(t("hero_none"))}</p>`;
+    return;
+  }
+  const sorted = [...withAvg].sort((a,b)=>a.avg-b.avg);
+  const fast = sorted[0], slow = sorted[sorted.length-1];
+  const lo = Math.min(...withAvg.map(d=>d.min).filter(v=>v!=null));
+  const hi = Math.max(...withAvg.map(d=>d.max).filter(v=>v!=null));
+  const avg = k.avg_duration;
+  const dSlow = slow.avg - avg, dFast = avg - fast.avg;
+  const ru = LANG === "ru";
+
+  const say = ru
+    ? `В среднем аппарат заканчивает партию за <b>${fmtHm(avg)}</b>.
+       Быстрее всех <span class="fast">№${fast.number} — ${fmtHm(fast.avg)}</span>${dFast>4?`, это на ${fmtHm(dFast)} меньше среднего`:""}.
+       Медленнее всех <span class="slow">№${slow.number} — ${fmtHm(slow.avg)}</span>${dSlow>4?`, на ${fmtHm(dSlow)} дольше среднего`:""}.
+       ${withAvg.length < DATA.kpi.dryer_count ? `Данные есть по ${withAvg.length} ${withAvg.length===1?"сушке":"сушкам"} из ${k.dryer_count} — остальные ещё не присылали отчётов.` : "Отчитались все сушки."}`
+    : `O'rtacha bir partiya <b>${fmtHm(avg)}</b> da tugaydi.
+       Eng tez <span class="fast">№${fast.number} — ${fmtHm(fast.avg)}</span>${dFast>4?`, o'rtachadan ${fmtHm(dFast)} kam`:""}.
+       Eng sekin <span class="slow">№${slow.number} — ${fmtHm(slow.avg)}</span>${dSlow>4?`, o'rtachadan ${fmtHm(dSlow)} ko'p`:""}.
+       ${withAvg.length < k.dryer_count ? `${k.dryer_count} sushkadan ${withAvg.length} tasi bo'yicha ma'lumot bor.` : "Barcha sushkalar hisobot berdi."}`;
+
+  box.innerHTML = `
+    <div>
+      <p class="big">${esc(t("hero_title"))}</p>
+      <div class="num">${fmtHm(avg).replace(/(\d+)(\D+)/g,'$1<span>$2</span>')}</div>
+      <div class="under">${esc(t("hero_avg"))} · ${esc(t("k_med"))} ${fmtHm(k.median_duration)}</div>
+    </div>
+    <div>
+      <p class="say">${say}</p>
+      <div class="pair">
+        <div>${esc(t("hero_fast"))}<b>№${fast.number} · ${fmtHm(fast.avg)}</b></div>
+        <div>${esc(t("hero_slow"))}<b>№${slow.number} · ${fmtHm(slow.avg)}</b></div>
+        <div>${esc(t("hero_spread"))}<b>${fmtH(lo)} – ${fmtH(hi)}</b></div>
+        ${N.min?`<div>${esc(t("hero_norm"))}<b>${Math.round(N.min/60)}–${Math.round(N.max/60)} ${t("hours")}</b></div>`:""}
+      </div>
+    </div>`;
+}
+
+/* ---- рейтинг: кто сушит дольше ---- */
+function renderRank(){
+  const rows = DATA.dryers.filter(d => d.avg != null).sort((a,b)=>b.avg-a.avg);
+  const host = $("#rank");
+  if (!rows.length){ host.innerHTML = `<p class="empty">${t("none")}</p>`; return; }
+  const max = Math.max(...rows.map(d=>d.avg)) * 1.02;
+  const gAvg = Math.round(rows.reduce((a,b)=>a+b.avg,0)/rows.length);
+  const N = DATA.norm || {};
+
+  host.innerHTML = `<div class="rank">${rows.map(d=>{
+    const w = Math.max(2, 100*d.avg/max);
+    const dl = d.avg - gAvg;
+    const near = Math.abs(dl) < 5;
+    const cls = near ? "" : (dl > 0 ? "up" : "down");
+    const dtxt = near ? "±0" : (dl > 0 ? "+" : "−") + fmtH(Math.abs(dl));
+    const badge = (N.max && d.avg > N.max) ? `<span class="badge slow">${t("b_slow")}</span>`
+               : (N.min && d.avg < N.min) ? `<span class="badge fastb">${t("b_fast")}</span>` : "";
+    return `<div class="rrow" data-n="${d.number}" style="cursor:pointer">
+      <span class="rnum">№${d.number}</span>
+      <div class="rbar"><i style="width:${w}%"></i></div>
+      <b class="rtime">${fmtH(d.avg)}</b>
+      <span class="rdelta ${cls}">${dtxt} ${badge}</span>
+    </div>`;
+  }).join("")}
+  <div class="rmark" style="left:0;opacity:0">
+    <span>${esc(t("rank_avgline"))} ${fmtH(gAvg)}</span></div></div>`;
+
+  // ставим пунктир ровно на среднее, измеряя реальную ширину полосы
+  const place = () => {
+    const bar = host.querySelector(".rbar"), mark = host.querySelector(".rmark");
+    const wrap = host.querySelector(".rank");
+    if (!bar || !mark || !wrap) return;
+    const b = bar.getBoundingClientRect(), w = wrap.getBoundingClientRect();
+    mark.style.left = (b.left - w.left + b.width * gAvg / max) + "px";
+    mark.style.opacity = 1;
+  };
+  place();
+  requestAnimationFrame(place);
+
+  host.querySelectorAll(".rrow").forEach(r=>{
+    const d = rows.find(x=>x.number === +r.dataset.n);
+    onTip(r, e=>showTip(e,
+      `<b>№${d.number}</b><br>
+       <span class="tk">${t("th_avg")}:</span> <b>${fmtHm(d.avg)}</b><br>
+       <span class="tk">min / max:</span> <b>${fmtH(d.min)} / ${fmtH(d.max)}</b><br>
+       <span class="tk">${t("th_count")}:</span> <b>${d.batches}</b><br>
+       <span class="tk">${t("th_delta")}:</span> <b>${d.avg-gAvg>0?"+":""}${d.avg-gAvg} ${t("minutes")}</b>`));
+    offTip(r, hideTip);
+    r.addEventListener("click", ()=>openDryer(+r.dataset.n));
+  });
+}
+
 function tile(label, value, meta, accent){
   return `<div class="tile"><div class="label">${esc(label)}</div>
     <div class="value"${accent?` style="color:${css(accent)}"`:""}>${value}</div>
@@ -694,19 +888,34 @@ function renderDryers(){
   $("#dryLegend").innerHTML = ["running","overdue","stale","no_data"].map(s=>
     `<span><i style="background:${css(STATUS_COLOR[s])};border-radius:50%"></i>${esc(t("st_"+s))}</span>`).join("");
 
-  DATA.dryers.forEach(d=>{
+  const mode = $("#drySort").value;
+  const list = [...DATA.dryers];
+  const rank = v => v==null ? -Infinity : v;
+  if (mode==="slow")   list.sort((a,b)=>rank(b.avg)-rank(a.avg));
+  if (mode==="fast")   list.sort((a,b)=>(a.avg==null)-(b.avg==null) || rank(a.avg)-rank(b.avg));
+  if (mode==="recent") list.sort((a,b)=>(a.since_minutes==null)-(b.since_minutes==null)
+                                        || (a.since_minutes||0)-(b.since_minutes||0));
+
+  list.forEach(d=>{
     const pct = d.since_minutes!=null && d.expected_minutes
       ? Math.min(100, Math.round(100*d.since_minutes/d.expected_minutes)) : 0;
     const n = document.createElement("div");
     n.className = "dry" + (d.status==="no_data" ? " nodata" : "");
+    const N = DATA.norm || {};
+    // молчание = норма; бейдж только когда есть на что смотреть
+    const badge = d.avg==null ? ""
+      : (N.max && d.avg > N.max) ? `<span class="badge slow">${t("b_slow")}</span>`
+      : (N.min && d.avg < N.min) ? `<span class="badge fastb">${t("b_fast")}</span>` : "";
     n.innerHTML = `
-      <div class="n">№${d.number}</div>
-      <div class="st"><span class="dot" style="background:${css(STATUS_COLOR[d.status])}"></span>
-        <span>${STATUS_ICON[d.status]} ${esc(t("st_"+d.status))}</span></div>
-      <div class="row"><span>${esc(d.last_product||"—")}</span><b>${d.last_duration!=null?fmtH(d.last_duration):"—"}</b></div>
+      <div class="n"><span>№${d.number}</span>${badge}</div>
+      <div class="hero-t">${d.last_duration!=null?fmtH(d.last_duration):"—"}</div>
+      <div class="hero-c">${d.last_duration!=null ? esc(t("last_cycle")) + (d.last_product?" · "+esc(d.last_product):"")
+                                                  : esc(t("no_reports"))}</div>
+      <div class="st" style="margin-top:8px"><span class="dot" style="background:${css(STATUS_COLOR[d.status])}"></span>
+        <span>${STATUS_ICON[d.status]} ${esc(t("st_"+d.status))}${d.batches?` · ${d.batches}`:""}</span></div>
       <div class="row"><span class="muted">${t("th_avg")}</span><b>${d.avg!=null?fmtH(d.avg):"—"}</b></div>
-      <div class="row"><span class="muted">${d.batches} ${t("batches")}</span>
-        <b title="t° / ${esc(t("th_h"))}">${d.temperature!=null? d.temperature+"°":""}${d.humidity!=null? " · "+d.humidity+"%":""}</b></div>
+      <div class="row"><span class="muted">t° · ${LANG==="ru"?"вл.":"nam."}</span>
+        <b>${d.temperature!=null? d.temperature+"°":"—"}${d.humidity!=null? " · "+d.humidity+"%":""}</b></div>
       <div class="bar"><i style="width:${pct}%;background:${css(STATUS_COLOR[d.status])}"></i></div>`;
     onTip(n, e=>showTip(e,
       `<b>Сушка №${d.number}</b><br>
@@ -734,6 +943,11 @@ function renderCharts(){
 
   const TL = DATA.timeline;
   const every = Math.max(1, Math.ceil(TL.length/10));
+  const daysWithData = TL.filter(d=>d.count>0).length;
+  if (daysWithData < 3){
+    $("#chDaily").innerHTML = `<p class="empty">${t("few_data")}</p>`;
+    $("#chTrend").innerHTML = `<p class="empty">${t("few_data")}</p>`;
+  } else {
   vbars($("#chDaily"), TL, {
     value:d=>d.count, label:d=>d.date.slice(8)+"."+d.date.slice(5,7), fmt:v=>Math.round(v),
     labelEvery:every,
@@ -748,20 +962,11 @@ function renderCharts(){
     tipHtml:d=>`<b>${fmtDateOnly(d.date)}</b><br><span class="tk">${t("k_avg")}:</span> <b>${d.avg!=null?fmtHm(d.avg):"—"}</b><br>
       <span class="tk">${t("th_count")}:</span> <b>${d.count}</b>`
   });
+  }
 
   vbars($("#chHist"), DATA.durations, {
     value:d=>d.count, label:d=>d.label.split("–")[0], fmt:v=>Math.round(v), directLabels:true,
     tipHtml:d=>`<b>${esc(d.label)}</b><br><span class="tk">${t("th_count")}:</span> <b>${d.count}</b>`
-  });
-
-  const DD = DATA.dryers.filter(d=>d.avg!=null);
-  const gAvg = DD.length ? Math.round(DD.reduce((a,b)=>a+b.avg,0)/DD.length) : 0;
-  vbars($("#chDryers"), DATA.dryers, {
-    value:d=>d.avg||0, label:d=>d.number, fmt:v=>fmtH(Math.round(v)), h:260,
-    refLine:gAvg, refLabel:`${t("th_avg")} ${fmtH(gAvg)}`,
-    tipHtml:d=>`<b>№${d.number}</b><br><span class="tk">${t("th_avg")}:</span> <b>${d.avg!=null?fmtHm(d.avg):"—"}</b><br>
-      <span class="tk">${t("th_delta")}:</span> <b>${d.vs_global!=null?(d.vs_global>0?"+":"")+d.vs_global+" "+t("minutes"):"—"}</b><br>
-      <span class="tk">${t("th_count")}:</span> <b>${d.batches}</b>`
   });
 
   vbars($("#chHours"), DATA.hours, {
@@ -918,6 +1123,8 @@ $("#period").addEventListener("click", e=>{
   load();
 });
 $("#refreshBtn").onclick = load;
+$("#drySort").addEventListener("change", ()=>{ localStorage.setItem("drySort", $("#drySort").value); renderDryers(); });
+$("#drySort").value = localStorage.getItem("drySort") || "num";
 $("#langBtn").onclick = ()=>{ LANG = LANG==="ru"?"uz":"ru"; localStorage.setItem("lang",LANG); render(); };
 $("#themeBtn").onclick = ()=>{
   const cur = document.documentElement.dataset.theme;
@@ -929,7 +1136,8 @@ $("#themeBtn").onclick = ()=>{
   const n = document.getElementById(id);
   n.addEventListener(id==="fSearch"?"input":"change", renderAll);
 });
-addEventListener("resize", ()=>{ clearTimeout(window._rz); window._rz=setTimeout(()=>DATA&&renderCharts(),160); });
+addEventListener("resize", ()=>{ clearTimeout(window._rz);
+  window._rz = setTimeout(()=>{ if(DATA){ renderCharts(); renderRank(); } }, 160); });
 
 document.documentElement.dataset.theme = localStorage.getItem("theme") || "";
 [...$("#period").children].forEach(b=>b.setAttribute("aria-pressed", +b.dataset.days===DAYS));

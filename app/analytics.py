@@ -281,6 +281,7 @@ async def dashboard_payload(s: AsyncSession, days: int = 30) -> dict:
         "generated_at": dt.datetime.now(config.TZ).isoformat(),
         "days": days,
         "timezone": config.TIMEZONE,
+        "norm": {"min": config.NORM_MIN_MINUTES, "max": config.NORM_MAX_MINUTES},
         "kpi": kpi(batches, days),
         "dryers": dryers(batches),
         "products": by_product(batches),

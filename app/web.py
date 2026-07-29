@@ -35,24 +35,57 @@ def _authed(request: Request) -> bool:
 def create_app() -> FastAPI:
     app = FastAPI(title="Makaron Analytics", docs_url=None, redoc_url=None)
 
-    LOGIN_HTML = """<!doctype html><meta charset=utf-8>
+    LOGIN_HTML = """<!doctype html>
+<html lang=uz><meta charset=utf-8>
+<meta name=viewport content="width=device-width,initial-scale=1,viewport-fit=cover">
 <title>Makaron Analytics</title>
+<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'%3E%3Ctext y='.9em' font-size='90'%3E&#127837;%3C/text%3E%3C/svg%3E">
 <style>
-body{font:16px system-ui,-apple-system,"Segoe UI",sans-serif;background:#f9f9f7;color:#0b0b0b;
-display:grid;place-items:center;height:100vh;margin:0}
-form{background:#fcfcfb;padding:32px;border-radius:16px;border:1px solid rgba(11,11,11,.1);
-box-shadow:0 1px 3px rgba(0,0,0,.06);width:300px}
-h1{font-size:18px;margin:0 0 16px}
-input{width:100%;padding:10px 12px;border:1px solid #c3c2b7;border-radius:8px;font-size:15px;box-sizing:border-box}
-button{width:100%;margin-top:12px;padding:10px;border:0;border-radius:8px;background:#2a78d6;color:#fff;
-font-size:15px;font-weight:600;cursor:pointer}
-p{color:#52514e;font-size:13px;margin:0 0 12px}
-@media(prefers-color-scheme:dark){body{background:#0d0d0d;color:#fff}form{background:#1a1a19;border-color:rgba(255,255,255,.1)}
-input{background:#0d0d0d;color:#fff;border-color:#383835}}
+*{box-sizing:border-box}
+:root{--surface:#fcfcfb;--plane:#f9f9f7;--ink:#0b0b0b;--ink2:#52514e;--line:#c3c2b7;
+      --border:rgba(11,11,11,.10);--brand:#2a78d6;--bad:#d03b3b}
+@media(prefers-color-scheme:dark){:root{--surface:#1a1a19;--plane:#0d0d0d;--ink:#fff;--ink2:#c3c2b7;
+      --line:#383835;--border:rgba(255,255,255,.10);--brand:#3987e5;--bad:#d03b3b}}
+html,body{height:100%}
+body{margin:0;background:var(--plane);color:var(--ink);
+  font:16px/1.45 system-ui,-apple-system,"Segoe UI",sans-serif;-webkit-font-smoothing:antialiased;
+  display:flex;align-items:center;justify-content:center;
+  padding:24px max(20px,env(safe-area-inset-left)) calc(24px + env(safe-area-inset-bottom))}
+form{background:var(--surface);border:1px solid var(--border);border-radius:20px;
+  box-shadow:0 8px 30px rgba(0,0,0,.07);width:100%;max-width:420px;padding:32px 28px}
+.logo{font-size:44px;line-height:1;margin-bottom:14px}
+h1{font-size:22px;font-weight:650;letter-spacing:-.02em;margin:0 0 6px}
+p{color:var(--ink2);font-size:15px;margin:0 0 22px}
+label{display:block;font-size:13px;color:var(--ink2);margin-bottom:7px;font-weight:500}
+input{width:100%;height:54px;padding:0 16px;border:1.5px solid var(--line);border-radius:12px;
+  font-size:17px;background:var(--plane);color:var(--ink);outline:none}
+input:focus{border-color:var(--brand);box-shadow:0 0 0 3px color-mix(in srgb,var(--brand) 22%,transparent)}
+button{width:100%;margin-top:16px;height:54px;border:0;border-radius:12px;background:var(--brand);
+  color:#fff;font-size:17px;font-weight:600;cursor:pointer;-webkit-tap-highlight-color:transparent}
+button:active{opacity:.85}
+.err{background:color-mix(in srgb,var(--bad) 12%,transparent);color:var(--bad);
+  border-radius:10px;padding:11px 14px;font-size:14px;margin:0 0 18px;font-weight:500}
+@media(min-width:760px){
+  form{max-width:380px;padding:34px 30px}
+  .logo{font-size:38px}
+  h1{font-size:20px}
+  input,button{height:48px;font-size:16px}
+}
 </style>
-<form method=get action=/login><h1>🍝 Makaron Analytics</h1>
-<p>Parolni kiriting</p>
-<input name=p type=password autofocus placeholder="Parol"><button>Kirish</button></form>"""
+<form method=get action=/login>
+  <div class=logo>&#127837;</div>
+  <h1>Makaron Analytics</h1>
+  <p>Quritish sexi &middot; hisobotlar paneli</p>
+  __ERROR__
+  <label for=p>Parol</label>
+  <input id=p name=p type=password autofocus autocomplete=current-password
+         inputmode=text placeholder="&bull;&bull;&bull;&bull;">
+  <button>Kirish</button>
+</form>"""
+
+    def login_page(error: bool = False) -> str:
+        block = '<p class="err">Parol to\'g\'ri kelmadi. Yana urinib ko\'ring.</p>' if error else ""
+        return LOGIN_HTML.replace("__ERROR__", block)
 
     @app.get("/health")
     async def health():
@@ -66,7 +99,7 @@ input{background:#0d0d0d;color:#fff;border-color:#383835}}
             r = Response(status_code=302, headers={"Location": "/"})
             r.set_cookie(COOKIE, _token(), max_age=60 * 60 * 24 * 90, httponly=True, samesite="lax")
             return r
-        return HTMLResponse(LOGIN_HTML)
+        return HTMLResponse(login_page(error=bool(p)), status_code=401 if p else 200)
 
     @app.middleware("http")
     async def guard(request: Request, call_next):
@@ -77,7 +110,7 @@ input{background:#0d0d0d;color:#fff;border-color:#383835}}
             return resp
         if request.url.path.startswith("/api/"):
             return JSONResponse({"error": "unauthorized"}, status_code=401)
-        return HTMLResponse(LOGIN_HTML, status_code=401)
+        return HTMLResponse(login_page(), status_code=401)
 
     @app.get("/")
     async def index():

@@ -62,7 +62,7 @@ h1 .sub{font-weight:400;color:var(--ink-muted);font-size:13px}
 .btn:hover{background:var(--grid)}
 .btn.primary{background:var(--s1);border-color:var(--s1);color:#fff;font-weight:600}
 
-section{margin:22px 0}
+section{margin:22px 0;min-width:0}
 h2{font-size:14px;font-weight:650;margin:0 0 4px;letter-spacing:.01em}
 .hint{color:var(--ink-muted);font-size:12.5px;margin:0 0 12px}
 
@@ -88,7 +88,7 @@ h2{font-size:14px;font-weight:650;margin:0 0 4px;letter-spacing:.01em}
 .dry.nodata{opacity:.55}
 
 .cards{display:grid;grid-template-columns:repeat(auto-fit,minmax(380px,1fr));gap:14px}
-.card{background:var(--surface-1);border:1px solid var(--border);border-radius:var(--radius);padding:16px 16px 10px}
+.card{background:var(--surface-1);border:1px solid var(--border);border-radius:var(--radius);padding:16px 16px 10px;min-width:0;overflow:hidden}
 .card h3{font-size:13.5px;margin:0 0 2px;font-weight:640}
 .card .cap{font-size:12px;color:var(--ink-muted);margin:0 0 10px}
 .card.wide{grid-column:1/-1}
@@ -130,7 +130,62 @@ dialog{border:1px solid var(--border);border-radius:var(--radius);background:var
 dialog::backdrop{background:rgba(0,0,0,.45)}
 .dlg-h{padding:14px 18px;border-bottom:1px solid var(--border);display:flex;align-items:center;gap:10px}
 .dlg-b{padding:16px 18px;max-height:64vh;overflow:auto}
-@media (max-width:640px){.tile .value{font-size:23px}.wrap{padding:14px 12px 0}.top-in{padding:10px 12px}}
+.controls{display:flex;gap:8px;align-items:center;flex-wrap:wrap}
+
+/* ---------------- мобильные ---------------- */
+@media (max-width:760px){
+  body{padding-bottom:calc(28px + env(safe-area-inset-bottom))}
+  .wrap{padding:12px 12px 0}
+  .top-in{padding:9px 12px calc(9px + env(safe-area-inset-top,0px));gap:8px;flex-wrap:nowrap}
+  h1{font-size:15px;gap:6px;min-width:0}
+  h1 .sub{display:none}
+  .spacer{display:none}
+  /* строка 1: заголовок + кнопки, строка 2: период на всю ширину */
+  .top-in{flex-wrap:wrap}
+  .controls{flex:1;justify-content:flex-end;flex-wrap:wrap;row-gap:8px}
+  .controls>*{flex:none}
+  #period{order:2;flex:1 1 100%;width:100%}
+  #period button{flex:1;text-align:center}
+  .seg button{padding:6px 9px;font-size:12px}
+  .btn{padding:6px 9px;font-size:12px}
+  #exportBtn{font-size:0;padding:6px 10px}
+  #exportBtn::before{content:"⤓ XLS";font-size:12px}
+
+  section{margin:16px 0}
+  .kpis{grid-template-columns:1fr 1fr;gap:8px}
+  .tile{padding:11px 12px;border-radius:12px}
+  .tile .label{font-size:11.5px;margin-bottom:3px}
+  .tile .value{font-size:21px}
+  .tile .meta{font-size:11px}
+
+  .grid31{grid-template-columns:1fr 1fr;gap:8px}
+  .dry{padding:10px}
+  .dry .n{font-size:17px}
+  .dry .st{font-size:11px}
+  .dry .row{font-size:11px;margin-top:5px}
+
+  .cards{grid-template-columns:1fr;gap:10px}
+  .card{padding:13px 12px 8px;border-radius:12px}
+  .card .cap{font-size:11.5px}
+
+  .hint{font-size:12px}
+  .hide-sm{display:none}
+  th{font-size:10px;padding:6px;letter-spacing:0}
+  td{padding:7px 6px;font-size:12.5px}
+  .tbl-wrap{max-height:62vh;-webkit-overflow-scrolling:touch}
+  .qlabel{display:none}
+  .pill{padding:2px 6px}
+  .filters{gap:6px}
+  .filters input,.filters select{font-size:16px;padding:8px 10px;flex:1 1 46%;min-width:0}
+  .filters input#fSearch{flex:1 1 100%}
+  #tip{max-width:min(280px,86vw);font-size:12px}
+  dialog{max-width:100vw;border-radius:14px 14px 0 0;margin-bottom:0}
+  .dlg-b{max-height:70vh;padding:14px}
+}
+@media (max-width:420px){
+  .grid31{grid-template-columns:1fr 1fr;gap:7px}
+  .kpis{grid-template-columns:1fr 1fr}
+}
 @media print{.no-print{display:none}}
 </style>
 </head>
@@ -140,16 +195,18 @@ dialog::backdrop{background:rgba(0,0,0,.45)}
   <div class="top-in">
     <h1>🍝 Makaron Analytics <span class="sub" id="subtitle">сушильный цех</span></h1>
     <div class="spacer"></div>
-    <div class="seg" id="period" role="group" aria-label="Период">
-      <button data-days="1" aria-pressed="false">24ч</button>
-      <button data-days="7" aria-pressed="true">7д</button>
-      <button data-days="30" aria-pressed="false">30д</button>
-      <button data-days="90" aria-pressed="false">90д</button>
+    <div class="controls">
+      <div class="seg" id="period" role="group" aria-label="Период">
+        <button data-days="1" aria-pressed="false">24ч</button>
+        <button data-days="7" aria-pressed="true">7д</button>
+        <button data-days="30" aria-pressed="false">30д</button>
+        <button data-days="90" aria-pressed="false">90д</button>
+      </div>
+      <button class="btn" id="langBtn" title="Til / Язык">UZ</button>
+      <button class="btn" id="themeBtn" title="Тема">◐</button>
+      <a class="btn" id="exportBtn" href="/api/export.xlsx?days=7">⤓ Excel</a>
+      <button class="btn primary" id="refreshBtn">↻</button>
     </div>
-    <button class="btn" id="langBtn" title="Til / Язык">UZ</button>
-    <button class="btn" id="themeBtn" title="Тема">◐</button>
-    <a class="btn" id="exportBtn" href="/api/export.xlsx?days=7">⤓ Excel</a>
-    <button class="btn primary" id="refreshBtn">↻</button>
   </div>
 </header>
 
@@ -339,6 +396,22 @@ function showTip(ev, html){
   tip.style.left = x+"px"; tip.style.top = y+"px";
 }
 const hideTip = () => tip.style.opacity = 0;
+/* один набор биндингов и для мыши, и для тача */
+function onTip(node, handler){
+  node.addEventListener("pointerenter", handler);
+  node.addEventListener("pointermove", handler);
+  node.addEventListener("pointerdown", handler);
+}
+function offTip(node, handler){
+  node.addEventListener("pointerleave", e => { if (e.pointerType === "mouse") handler(e); });
+  node.addEventListener("pointercancel", handler);
+  node.addEventListener("pointerup", e => {
+    if (e.pointerType === "mouse") handler(e);
+    else setTimeout(hideTip, 2600);   // палец убрали — держим подсказку ещё пару секунд
+  });
+}
+/* тап по пустому месту закрывает подсказку */
+addEventListener("pointerdown", e => { if (!e.target.closest || !e.target.closest("svg,.dry")) hideTip(); }, true);
 addEventListener("scroll", hideTip, {passive:true});
 
 /* ------------------------------------------------------------------ charts */
@@ -378,6 +451,8 @@ function vbars(host, data, {value, label, color="--s1", fmt=(v=>v), tipHtml, h=2
   yAxis(f, max, fmt);
   const step = f.iw/data.length, bw = Math.max(3, Math.min(38, step*0.62));
   const c = css(color);
+  // автоматически разрежаем подписи, если они не влезают
+  labelEvery = Math.max(labelEvery, Math.ceil(20/Math.max(step,1)));
   data.forEach((d,i)=>{
     const v = value(d)||0;
     const bh = f.ih*v/max, x = f.x0 + step*i + (step-bw)/2, y = f.y1-bh;
@@ -395,8 +470,8 @@ function vbars(host, data, {value, label, color="--s1", fmt=(v=>v), tipHtml, h=2
       tx.textContent = fmt(v); f.svg.append(tx);
     }
     const hit = el("rect",{x:f.x0+step*i,y:f.y0,width:step,height:f.ih,class:"hit"});
-    hit.addEventListener("mousemove", e=>showTip(e, tipHtml(d)));
-    hit.addEventListener("mouseleave", hideTip);
+    onTip(hit, e=>showTip(e, tipHtml(d)));
+    offTip(hit, hideTip);
     f.svg.append(hit);
     if(i%labelEvery===0){
       const lx = el("text",{x:x+bw/2,y:f.y1+15,class:"tick","text-anchor":"middle"});
@@ -415,7 +490,8 @@ function vbars(host, data, {value, label, color="--s1", fmt=(v=>v), tipHtml, h=2
 function hbars(host, data, {value, label, color="--s1", fmt=(v=>v), tipHtml, range=null}={}){
   if(!data.length){ host.innerHTML = `<p class="empty">${t("none")}</p>`; return; }
   const rowH = 30, h = Math.max(120, data.length*rowH+24);
-  const f = frame(host,{h, padL:98, padR:52, padT:6, padB:18});
+  const narrow = (host.clientWidth || 380) < 430;
+  const f = frame(host,{h, padL: narrow ? 56 : 98, padR: narrow ? 38 : 52, padT:6, padB:18});
   const max = Math.max(...data.map(value),1)*1.1;
   const c = css(color);
   data.forEach((d,i)=>{
@@ -427,8 +503,8 @@ function hbars(host, data, {value, label, color="--s1", fmt=(v=>v), tipHtml, ran
     const vl = el("text",{x:f.x0+bw+7,y:y+bh-2,class:"dlabel"});
     vl.textContent = fmt(v); f.svg.append(vl);
     const hit = el("rect",{x:0,y:y-5,width:f.w,height:rowH,class:"hit"});
-    hit.addEventListener("mousemove", e=>showTip(e,tipHtml(d)));
-    hit.addEventListener("mouseleave", hideTip);
+    onTip(hit, e=>showTip(e,tipHtml(d)));
+    offTip(hit, hideTip);
     f.svg.append(hit);
   });
 }
@@ -437,7 +513,8 @@ function hbars(host, data, {value, label, color="--s1", fmt=(v=>v), tipHtml, ran
 function rangeDots(host, data, {lo, hi, mid, label, color="--s1", fmt=(v=>v), tipHtml}={}){
   if(!data.length){ host.innerHTML = `<p class="empty">${t("none")}</p>`; return; }
   const rowH = 34, h = data.length*rowH + 40;
-  const f = frame(host,{h, padL:96, padR:58, padT:8, padB:26});
+  const narrow = (host.clientWidth || 380) < 430;
+  const f = frame(host,{h, padL: narrow ? 72 : 96, padR: narrow ? 46 : 58, padT:8, padB:26});
   const vals = data.flatMap(d=>[lo(d),hi(d),mid(d)]).filter(v=>v!=null);
   const vmax = Math.max(...vals)*1.06, vmin = 0;
   const X = v => f.x0 + f.iw*(v-vmin)/((vmax-vmin)||1);
@@ -462,8 +539,8 @@ function rangeDots(host, data, {lo, hi, mid, label, color="--s1", fmt=(v=>v), ti
     }
     const lb = el("text",{x:f.x0-10,y:y+4,class:"tick","text-anchor":"end"}); lb.textContent = label(d); f.svg.append(lb);
     const hit = el("rect",{x:0,y:y-rowH/2,width:f.w,height:rowH,class:"hit"});
-    hit.addEventListener("mousemove", e=>showTip(e,tipHtml(d)));
-    hit.addEventListener("mouseleave", hideTip);
+    onTip(hit, e=>showTip(e,tipHtml(d)));
+    offTip(hit, hideTip);
     f.svg.append(hit);
   });
   const lg = document.createElement("div");
@@ -499,14 +576,14 @@ function lineChart(host, data, {value, label, color="--s1", fmt=(v=>v), tipHtml,
   const cross = el("line",{x1:0,x2:0,y1:f.y0,y2:f.y1,stroke:css("--axis"),"stroke-width":1,opacity:0});
   f.svg.append(cross);
   const hit = el("rect",{x:f.x0-step/2,y:f.y0,width:f.iw+step,height:f.ih,class:"hit"});
-  hit.addEventListener("mousemove", e=>{
+  onTip(hit, e=>{
     const bb = f.svg.getBoundingClientRect();
     const rel = (e.clientX-bb.left)/bb.width*f.w;
     const i = Math.max(0, Math.min(data.length-1, Math.round((rel-f.x0)/(step||1))));
     cross.setAttribute("x1",X(i)); cross.setAttribute("x2",X(i)); cross.setAttribute("opacity",.7);
     showTip(e, tipHtml(data[i]));
   });
-  hit.addEventListener("mouseleave", ()=>{cross.setAttribute("opacity",0); hideTip();});
+  offTip(hit, ()=>{cross.setAttribute("opacity",0); hideTip();});
   f.svg.append(hit);
   data.forEach((d,i)=>{ if(i%labelEvery===0){
     const lx = el("text",{x:X(i),y:f.y1+15,class:"tick","text-anchor":"middle"});
@@ -540,12 +617,12 @@ function heatmap(host, {rows, cols, get, fmt, tipHtml}){
       const v = get(r,c);
       const rect = el("rect",{x:labelW+j*cell+1, y:headH+i*cell+1, width:cell-2, height:cell-2, rx:4,
         fill: v==null ? css("--grid") : bucket(v), opacity: v==null?.45:1, class:"mark"});
-      rect.addEventListener("mousemove", e=>showTip(e, tipHtml(r,c,v)));
-      rect.addEventListener("mouseleave", hideTip);
+      onTip(rect, e=>showTip(e, tipHtml(r,c,v)));
+      offTip(rect, hideTip);
       svg.append(rect);
     });
   });
-  const scroll = el("div",{style:"overflow-x:auto"}); scroll.append(svg);
+  const scroll = el("div",{style:"overflow-x:auto;max-width:100%;-webkit-overflow-scrolling:touch"}); scroll.append(svg);
   const lg = el("div",{class:"legend"});
   lg.innerHTML = `<span>${fmt(lo)}</span>` + ramp.map(c=>`<i style="background:${c};margin:0"></i>`).join("") + `<span>${fmt(hi)}</span>`;
   host.append(scroll, lg);
@@ -621,14 +698,14 @@ function renderDryers(){
       <div class="row"><span class="muted">${d.batches} ${t("batches")}</span>
         <b title="t° / ${esc(t("th_h"))}">${d.temperature!=null? d.temperature+"°":""}${d.humidity!=null? " · "+d.humidity+"%":""}</b></div>
       <div class="bar"><i style="width:${pct}%;background:${css(STATUS_COLOR[d.status])}"></i></div>`;
-    n.addEventListener("mousemove", e=>showTip(e,
+    onTip(n, e=>showTip(e,
       `<b>Сушка №${d.number}</b><br>
        <span class="tk">${t("th_count")}:</span> <b>${d.batches}</b><br>
        <span class="tk">${t("th_avg")}:</span> <b>${d.avg!=null?fmtHm(d.avg):"—"}</b><br>
        <span class="tk">min/max:</span> <b>${d.min!=null?fmtH(d.min):"—"} / ${d.max!=null?fmtH(d.max):"—"}</b><br>
        <span class="tk">${t("th_def")}:</span> <b>${d.defects}${d.defect_rate!=null?" ("+d.defect_rate+"%)":""}</b><br>
        <span class="tk">${t("th_last")}:</span> <b>${fmtDate(d.last_finished_at)}</b>`));
-    n.addEventListener("mouseleave", hideTip);
+    offTip(n, hideTip);
     n.addEventListener("click", ()=>openDryer(d.number));
     box.append(n);
   });
@@ -712,7 +789,7 @@ const fmtDateOnly = iso => new Date(iso+"T12:00:00").toLocaleDateString(LANG==="
 function qualityPill(q){
   const map = {ok:["--good","✓"], defect:["--critical","⚠"], unknown:["--ink-muted","·"]};
   const [c,i] = map[q]||map.unknown;
-  return `<span class="pill" style="color:${css(c)}">${i} ${esc(t("q_"+q))}</span>`;
+  return `<span class="pill" style="color:${css(c)}">${i}<span class="qlabel"> ${esc(t("q_"+q))}</span></span>`;
 }
 
 function renderTables(){
@@ -756,14 +833,16 @@ function renderAll(){
   $("#tblCount").textContent = `${rows.length} ${t("batches")}`;
   $("#tblAll").innerHTML = rows.length ? `<table><thead><tr>
       <th>${t("th_dryer")}</th><th>${t("th_product")}</th><th>${t("th_dur")}</th><th>${t("th_fin")}</th>
-      <th>${t("th_t")}</th><th>${t("th_h")}</th><th>${t("th_q")}</th><th>${t("th_op")}</th><th>${t("th_note")}</th>
+      <th class="hide-sm">${t("th_t")}</th><th class="hide-sm">${t("th_h")}</th><th>${t("th_q")}</th>
+      <th class="hide-sm">${t("th_op")}</th><th class="hide-sm">${t("th_note")}</th>
     </tr></thead><tbody>${rows.map(r=>`<tr data-id="${r.id}" style="cursor:pointer">
       <td><b>${r.dryer!=null?"№"+r.dryer:'<span class="muted">?</span>'}</b></td>
       <td>${esc(r.product||"—")}</td><td>${fmtH(r.duration)}</td>
       <td class="muted">${fmtDate(r.finished_at)}</td>
-      <td>${r.temperature??"—"}</td><td>${r.humidity??"—"}</td>
-      <td>${qualityPill(r.quality)}</td><td>${esc(r.operator||"—")}</td>
-      <td class="muted">${esc((r.note||"").slice(0,40))}${r.needs_review?' <span class="pill" style="color:'+css("--warning")+'">⚠</span>':""}</td>
+      <td class="hide-sm">${r.temperature??"—"}</td><td class="hide-sm">${r.humidity??"—"}</td>
+      <td>${qualityPill(r.quality)}${r.needs_review?' <span class="pill" style="color:'+css("--warning")+'">⚠</span>':""}</td>
+      <td class="hide-sm">${esc(r.operator||"—")}</td>
+      <td class="muted hide-sm">${esc((r.note||"").slice(0,40))}</td>
     </tr>`).join("")}</tbody></table>` : `<p class="empty">${t("none")}</p>`;
   $("#tblAll").querySelectorAll("tr[data-id]").forEach(tr=>
     tr.addEventListener("click", ()=>openBatch(+tr.dataset.id)));

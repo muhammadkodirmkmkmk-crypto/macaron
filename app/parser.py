@@ -250,10 +250,29 @@ def map_display(l1: str | None, l2: str | None, l3: str | None) -> tuple[str | N
             nums = nums[1:]
     temp = hum = None
     frac = lambda x: ("." in x or "," in x)
-    # температура: только значение с десятичной точкой в рабочем диапазоне
+
+    def as_temp(raw: str) -> float | None:
+        """Табло МПР показывает температуру как XX.X — три-четыре разряда с одной
+        десятичной. Точку модели путают ('8.19', '564' вместо 81.9 и 56.4),
+        поэтому считаем по цифрам, а не по тому, где увидели точку."""
+        digits = re.sub(r"\D", "", raw)
+        if len(digits) in (3, 4):
+            cand = int(digits) / 10
+            if 20 <= cand <= 130:
+                return round(cand, 1)
+        return None
+
+    # температура: восстанавливаем из цифр строки с десятичной точкой
     for s, v in nums:
-        if temp is None and frac(s) and 20 <= v <= 120:
-            temp = v
+        if temp is None and frac(s):
+            temp = as_temp(s)
+    # запасной вариант: строка без точки, но по цифрам похожа на температуру
+    if temp is None:
+        for s, v in nums:
+            if not frac(s) and len(re.sub(r"\D", "", s)) == 3 and not (0 <= v <= 100):
+                temp = as_temp(s)
+                if temp is not None:
+                    break
     # влажность: только целое 0..100 (дробное здесь — почти всегда ошибка чтения)
     for s, v in nums:
         if hum is None and v != temp and not frac(s) and 0 <= v <= 100:
@@ -274,10 +293,9 @@ async def parse_with_vision(image_bytes: bytes, caption: str, media_type: str = 
         from anthropic import AsyncAnthropic
 
         client = AsyncAnthropic(api_key=config.ANTHROPIC_API_KEY)
-        resp = await client.messages.create(
+        kwargs = dict(
             model=config.ANTHROPIC_MODEL,
             max_tokens=600,
-            temperature=0,
             system=VISION_SYSTEM.format(max_dryer=config.DRYER_COUNT),
             messages=[{
                 "role": "user",
@@ -291,6 +309,12 @@ async def parse_with_vision(image_bytes: bytes, caption: str, media_type: str = 
                 ],
             }],
         )
+        try:
+            resp = await client.messages.create(temperature=0, **kwargs)
+        except Exception as exc:  # у новых моделей параметр temperature не принимается
+            if "temperature" not in str(exc):
+                raise
+            resp = await client.messages.create(**kwargs)
         text = "".join(b.text for b in resp.content if getattr(b, "type", "") == "text").strip()
         m = re.search(r"\{.*\}", text, re.S)
         data = json.loads(m.group(0) if m else text)

@@ -101,7 +101,8 @@ input{background:#0d0d0d;color:#fff;border-color:#383835}}
 
     @app.patch("/api/batches/{batch_id}")
     async def api_patch(batch_id: int, payload: dict = Body(...)):
-        allowed = {"dryer_number", "product", "duration_minutes", "quality", "note"}
+        allowed = {"dryer_number", "product", "duration_minutes", "quality",
+                   "note", "temperature", "humidity"}
         async with session() as s:
             b = await s.get(Batch, batch_id)
             if not b:
@@ -125,6 +126,32 @@ input{background:#0d0d0d;color:#fff;border-color:#383835}}
             await s.delete(b)
             await s.commit()
         return {"ok": True}
+
+    @app.post("/api/remap-display")
+    async def api_remap():
+        """Пересчитать температуру и влажность из сохранённых строк табло.
+        Идемпотентно: запускать можно сколько угодно раз."""
+        from .parser import map_display
+
+        changed = []
+        async with session() as s:
+            rows = (await s.execute(
+                select(Batch).where(Batch.display_raw.is_not(None))
+            )).scalars().all()
+            for b in rows:
+                parts = (b.display_raw or "").split("|")
+                parts += [""] * (3 - len(parts))
+                timer, temp, hum = map_display(*(x or None for x in parts[:3]))
+                if (temp, hum) != (b.temperature, b.humidity):
+                    changed.append({
+                        "id": b.id, "dryer": b.dryer_number, "raw": b.display_raw,
+                        "temperature": [b.temperature, temp], "humidity": [b.humidity, hum],
+                    })
+                    b.temperature, b.humidity = temp, hum
+                    if timer and not b.timer_raw:
+                        b.timer_raw = timer
+            await s.commit()
+        return {"scanned": len(rows), "updated": len(changed), "changes": changed[:100]}
 
     @app.get("/api/export.xlsx")
     async def api_export(days: int = Query(30, ge=1, le=365)):

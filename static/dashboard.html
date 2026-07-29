@@ -3,8 +3,9 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
-<title>Makaron Analytics — сушильный цех</title>
-<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'%3E%3Ctext y='.9em' font-size='90'%3E🍝%3C/text%3E%3C/svg%3E">
+<title>Sana Bogatir — аналитика сушки</title>
+<link rel="icon" href="/logo-64.png">
+<meta name="theme-color" content="#0A273D">
 <style>
 :root{
   color-scheme: light;
@@ -16,6 +17,7 @@
   --good:#0ca30c; --warning:#fab219; --serious:#ec835a; --critical:#d03b3b;
   --success-text:#006300;
   --seq-1:#cde2fb; --seq-2:#9ec5f4; --seq-3:#6da7ec; --seq-4:#3987e5; --seq-5:#256abf; --seq-6:#184f95;
+  --brand:#0A273D; --gold:#FBC443; --brand-ink:#ffffff;
   --radius:14px;
   --font: system-ui,-apple-system,"Segoe UI",sans-serif;
 }
@@ -48,19 +50,25 @@ body{margin:0;background:var(--plane);color:var(--ink-1);font:15px/1.45 var(--fo
 a{color:var(--s1)}
 .wrap{max-width:1500px;margin:0 auto;padding:20px 20px 0}
 
-header.top{position:sticky;top:0;z-index:40;background:var(--plane);
-  border-bottom:1px solid var(--border);backdrop-filter:saturate(1.4) blur(8px)}
+header.top{position:sticky;top:0;z-index:40;background:var(--brand);color:var(--brand-ink);
+  border-bottom:3px solid var(--gold);box-shadow:0 1px 12px rgba(10,39,61,.18)}
 .top-in{max-width:1500px;margin:0 auto;padding:12px 20px;display:flex;gap:12px;align-items:center;flex-wrap:wrap}
-h1{font-size:17px;margin:0;font-weight:650;letter-spacing:-.01em;display:flex;gap:8px;align-items:center}
-h1 .sub{font-weight:400;color:var(--ink-muted);font-size:13px}
+h1{font-size:17px;margin:0;font-weight:680;letter-spacing:-.01em;display:flex;gap:9px;align-items:center;
+   color:var(--brand-ink);min-width:0}
+h1 img{width:32px;height:32px;border-radius:50%;flex:none;background:#fff}
+h1 .name{display:flex;flex-direction:column;line-height:1.15;min-width:0}
+h1 .sub{font-weight:400;color:var(--gold);font-size:11.5px;letter-spacing:.01em}
 .spacer{flex:1}
-.seg{display:flex;background:var(--surface-1);border:1px solid var(--border);border-radius:10px;overflow:hidden}
-.seg button{border:0;background:transparent;color:var(--ink-2);padding:7px 12px;font:inherit;font-size:13px;cursor:pointer}
-.seg button[aria-pressed="true"]{background:var(--s1);color:#fff;font-weight:600}
-.btn{border:1px solid var(--border);background:var(--surface-1);color:var(--ink-1);
-  padding:7px 12px;border-radius:10px;font:inherit;font-size:13px;cursor:pointer;text-decoration:none;display:inline-flex;gap:6px;align-items:center}
-.btn:hover{background:var(--grid)}
-.btn.primary{background:var(--s1);border-color:var(--s1);color:#fff;font-weight:600}
+.seg{display:flex;background:rgba(255,255,255,.10);border:1px solid rgba(255,255,255,.20);
+     border-radius:10px;overflow:hidden}
+.seg button{border:0;background:transparent;color:rgba(255,255,255,.82);padding:7px 12px;font:inherit;
+     font-size:13px;cursor:pointer}
+.seg button[aria-pressed="true"]{background:var(--gold);color:var(--brand);font-weight:680}
+.btn{border:1px solid rgba(255,255,255,.24);background:rgba(255,255,255,.08);color:var(--brand-ink);
+  padding:7px 12px;border-radius:10px;font:inherit;font-size:13px;cursor:pointer;text-decoration:none;
+  display:inline-flex;gap:6px;align-items:center;-webkit-tap-highlight-color:transparent}
+.btn:hover{background:rgba(255,255,255,.18)}
+.btn.primary{background:var(--gold);border-color:var(--gold);color:var(--brand);font-weight:680}
 
 section{margin:22px 0;min-width:0}
 h2{font-size:14px;font-weight:650;margin:0 0 4px;letter-spacing:.01em}
@@ -137,8 +145,9 @@ dialog::backdrop{background:rgba(0,0,0,.45)}
   body{padding-bottom:calc(28px + env(safe-area-inset-bottom))}
   .wrap{padding:12px 12px 0}
   .top-in{padding:9px 12px calc(9px + env(safe-area-inset-top,0px));gap:8px;flex-wrap:nowrap}
-  h1{font-size:15px;gap:6px;min-width:0}
-  h1 .sub{display:none}
+  h1{font-size:14.5px;gap:7px;min-width:0}
+  h1 img{width:28px;height:28px}
+  h1 .sub{font-size:10.5px}
   .spacer{display:none}
   /* строка 1: заголовок + кнопки, строка 2: период на всю ширину */
   .top-in{flex-wrap:wrap}
@@ -193,7 +202,8 @@ dialog::backdrop{background:rgba(0,0,0,.45)}
 
 <header class="top no-print">
   <div class="top-in">
-    <h1>🍝 Makaron Analytics <span class="sub" id="subtitle">сушильный цех</span></h1>
+    <h1><img src="/logo.png" alt="Sana Bogatir">
+      <span class="name">Sana Bogatir<span class="sub" id="subtitle">сушильный цех</span></span></h1>
     <div class="spacer"></div>
     <div class="controls">
       <div class="seg" id="period" role="group" aria-label="Период">

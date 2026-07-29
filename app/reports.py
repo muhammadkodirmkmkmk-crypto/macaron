@@ -53,7 +53,7 @@ async def daily_report(s: AsyncSession) -> str:
     silent = [x for x in d if x["status"] in ("stale", "no_data")]
 
     lines = [
-        "📊 <b>7 kunlik hisobot</b>",
+        "🌾 <b>Sana Bogatir — 7 kunlik hisobot</b>",
         f"Partiyalar: <b>{k['batches_total']}</b> · kunlik o'rt.: {round(k['batches_total']/7, 1)}",
         f"O'rtacha sushish: <b>{fmt_dur(k['avg_duration'])}</b> (mediana {fmt_dur(k['median_duration'])})",
         f"Park yuklamasi: {k['utilization']}%",

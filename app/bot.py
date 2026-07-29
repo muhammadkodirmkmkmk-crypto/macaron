@@ -56,7 +56,7 @@ def _fmt_dur(minutes: int | None) -> str:
 @router.message(CommandStart())
 async def cmd_start(msg: Message):
     await msg.answer(
-        "🍝 <b>Makaron Analytics</b>\n\n"
+        "🌾 <b>Sana Bogatir</b> — quritish sexi\n\n"
         "Sushka hisobotlarini o'qib, dashboardga yig'aman.\n"
         "<b>Guruhda</b> ham, <b>shu yerda</b> ham ishlayman — farqi yo'q.\n\n"
         "Odatdagidek yuboring: sushka rasmi + izoh\n"

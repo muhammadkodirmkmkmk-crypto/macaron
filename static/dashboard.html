@@ -99,14 +99,15 @@ h2{font-size:14px;font-weight:650;margin:0 0 4px;letter-spacing:.01em}
 
 /* ---- рейтинг сушек по времени ---- */
 .rank{display:flex;flex-direction:column;gap:2px;position:relative;padding-top:18px}
-.rrow{display:grid;grid-template-columns:52px 1fr 72px 82px;gap:10px;align-items:center;
+.rrow{display:grid;grid-template-columns:52px 1fr 124px 106px;gap:10px;align-items:center;
   padding:5px 0;border-radius:8px}
 .rrow:hover{background:var(--plane)}
 .rnum{font-weight:660;font-size:13px;color:var(--ink-1);font-variant-numeric:tabular-nums}
 .rbar{height:16px;background:var(--grid);border-radius:4px;overflow:hidden;position:relative}
 .rbar i{display:block;height:100%;border-radius:4px;background:var(--s1)}
-.rtime{font-size:14px;font-weight:660;text-align:right;font-variant-numeric:tabular-nums;color:var(--ink-1)}
-.rdelta{font-size:12.5px;font-variant-numeric:tabular-nums;color:var(--ink-muted)}
+.rtime{font-size:14px;font-weight:660;text-align:right;font-variant-numeric:tabular-nums;
+  color:var(--ink-1);white-space:nowrap}
+.rdelta{font-size:12.5px;font-variant-numeric:tabular-nums;color:var(--ink-muted);white-space:nowrap}
 .rdelta.up{color:var(--critical);font-weight:600}
 .rdelta.down{color:var(--success-text);font-weight:600}
 .rmark{position:absolute;top:0;bottom:0;width:0;border-left:2px dashed var(--axis);pointer-events:none}
@@ -129,13 +130,13 @@ h2{font-size:14px;font-weight:650;margin:0 0 4px;letter-spacing:.01em}
 .tile .meta{font-size:12px;color:var(--ink-muted);margin-top:4px}
 .tile .value small{font-size:15px;font-weight:500;color:var(--ink-2)}
 
-.grid31{display:grid;grid-template-columns:repeat(auto-fill,minmax(148px,1fr));gap:10px}
+.grid31{display:grid;grid-template-columns:repeat(auto-fill,minmax(172px,1fr));gap:10px}
 .dry{background:var(--surface-1);border:1px solid var(--border);border-radius:12px;padding:11px 12px;cursor:pointer;
      position:relative;transition:transform .08s ease}
 .dry:hover{transform:translateY(-1px);border-color:var(--axis)}
 .dry .n{font-size:13px;font-weight:660;color:var(--ink-2);display:flex;justify-content:space-between;
   align-items:center;gap:6px}
-.dry .hero-t{font-size:26px;font-weight:680;letter-spacing:-.03em;line-height:1.05;margin:6px 0 1px;
+.dry .hero-t{font-size:25px;font-weight:680;letter-spacing:-.03em;line-height:1.12;margin:6px 0 1px;
   font-variant-numeric:tabular-nums}
 .dry .hero-c{font-size:11.5px;color:var(--ink-muted)}
 .dry .st{display:inline-flex;align-items:center;gap:5px;font-size:11.5px;color:var(--ink-2);margin-top:2px}
@@ -149,13 +150,14 @@ h2{font-size:14px;font-weight:650;margin:0 0 4px;letter-spacing:.01em}
 .dry.nodata{opacity:.55}
 
 /* котлы */
-.bhead{grid-column:1/-1;display:flex;align-items:baseline;gap:10px;flex-wrap:wrap;
-  margin:16px 0 0;padding-top:13px;border-top:1px solid var(--border)}
-.bhead:first-child{margin-top:0;padding-top:0;border-top:0}
-.bhead b{font-size:15.5px;font-weight:670;letter-spacing:-.01em}
-.bhead .bnums{font-size:11.5px;color:var(--ink-2);border:1px solid var(--border);
-  border-radius:7px;padding:1px 7px;white-space:nowrap}
-.bhead .bmeta{font-size:12px;color:var(--ink-muted);margin-left:auto;text-align:right}
+.bhead{grid-column:1/-1;display:flex;align-items:center;gap:11px;flex-wrap:wrap;
+  margin:30px 0 6px;padding:12px 15px;border-radius:12px;
+  background:var(--plane);border:1px solid var(--border);border-left:6px solid var(--ink-1)}
+.bhead:first-child{margin-top:2px}
+.bhead b{font-size:18px;font-weight:730;letter-spacing:-.015em}
+.bhead .bnums{font-size:12px;font-weight:600;color:var(--ink-1);background:var(--surface-1);
+  border:1px solid var(--border);border-radius:8px;padding:2px 8px;white-space:nowrap}
+.bhead .bmeta{font-size:12.5px;color:var(--ink-2);margin-left:auto;text-align:right}
 .boilers{display:grid;grid-template-columns:repeat(auto-fit,minmax(230px,1fr));gap:12px}
 .bcard{background:var(--surface-1);border:1px solid var(--border);border-radius:var(--radius);
   padding:14px 16px;cursor:pointer;transition:transform .08s ease}
@@ -169,6 +171,11 @@ h2{font-size:14px;font-weight:650;margin:0 0 4px;letter-spacing:.01em}
 .bcard .bl{font-size:12px;color:var(--ink-2)}
 .bcard .brow{display:flex;justify-content:space-between;font-size:11.5px;color:var(--ink-2);margin-top:8px}
 .bcard .brow b{color:var(--ink-1);font-variant-numeric:tabular-nums}
+
+/* «9 часов 30 минут»: цифры крупно, слова мелко — чтобы не путать с часами на табло */
+.tile .value i, .dry .hero-t i, .bcard .bv i, .hero .num i{
+  font-style:normal;font-size:.45em;font-weight:500;color:var(--ink-2);
+  letter-spacing:0;margin-left:.4em;white-space:nowrap}
 
 .cards{display:grid;grid-template-columns:repeat(auto-fit,minmax(380px,1fr));gap:14px}
 .card{background:var(--surface-1);border:1px solid var(--border);border-radius:var(--radius);padding:16px 16px 10px;min-width:0;overflow:hidden}
@@ -227,7 +234,7 @@ dialog::backdrop{background:rgba(0,0,0,.45)}
 @media (max-width:900px){
   .hero{grid-template-columns:1fr;gap:16px}
   .hero .num{font-size:44px}
-  .rrow{grid-template-columns:46px 1fr 66px 74px;gap:8px}
+  .rrow{grid-template-columns:44px 1fr 112px 92px;gap:8px}
 }
 @media (max-width:760px){
   body{padding-bottom:calc(28px + env(safe-area-inset-bottom))}
@@ -271,7 +278,8 @@ dialog::backdrop{background:rgba(0,0,0,.45)}
   .hero{padding:16px}
   .hero .num{font-size:40px}
   .hero .say{font-size:14px}
-  .rrow{grid-template-columns:42px 1fr 60px 0;gap:8px}
+  .rrow{grid-template-columns:36px 1fr 108px 0;gap:6px}
+  .rtime{font-size:12.5px}
   .rdelta{display:none}
   .rmark span{font-size:10px}
   th{font-size:10px;padding:6px;letter-spacing:0}
@@ -540,8 +548,48 @@ const el = (tag, attrs={}, kids=[]) => {
 };
 const SVG_TAGS = new Set(["svg","g","rect","path","line","text","circle","polyline","defs","clipPath","title"]);
 const css = v => getComputedStyle(document.documentElement).getPropertyValue(v).trim();
-const fmtH = m => m==null ? "—" : `${Math.floor(m/60)}:${String(m%60).padStart(2,"0")}`;
-const fmtHm = m => m==null ? "—" : `${Math.floor(m/60)}${t("hours")} ${String(m%60).padStart(2,"0")}${LANG==="ru"?"м":"m"}`;
+/* Время сушки — это длительность, а не время на часах, поэтому «9 часов 30 минут»,
+   а не «9:30»: операторы читали второе как показания табло. */
+const plural = (n, forms) => {           // 1 час · 2 часа · 5 часов
+  const a = Math.abs(n) % 100, b = a % 10;
+  return forms[a > 10 && a < 20 ? 2 : b === 1 ? 0 : b >= 2 && b <= 4 ? 1 : 2];
+};
+const WORD = {
+  ru:{h:["час","часа","часов"], m:["минута","минуты","минут"], hs:"ч", ms:"мин"},
+  uz:{h:["soat","soat","soat"], m:["daqiqa","daqiqa","daqiqa"], hs:"soat", ms:"min"},
+};
+const _hm = m => [Math.floor(m/60), m%60];
+
+/** Полная форма для крупных чисел: «9 часов 30 минут». */
+const fmtHm = m => {
+  if (m==null) return "—";
+  const W = WORD[LANG] || WORD.ru, [h, mi] = _hm(m);
+  const p = [];
+  if (h) p.push(`${h} ${plural(h, W.h)}`);
+  if (mi || !h) p.push(`${mi} ${plural(mi, W.m)}`);
+  return p.join(" ");
+};
+/** То же, но цифры крупно, слова мелко (для .value / .hero-t / .bv / .num). */
+const fmtBig = m => {
+  if (m==null) return "—";
+  const W = WORD[LANG] || WORD.ru, [h, mi] = _hm(m);
+  const p = [];
+  if (h) p.push(`${h}<i>${plural(h, W.h)}</i>`);
+  if (mi || !h) p.push(`${mi}<i>${plural(mi, W.m)}</i>`);
+  return p.join(" ");
+};
+/** Короткая форма для таблиц и подсказок: «9 ч 30 мин». */
+const fmtH = m => {
+  if (m==null) return "—";
+  const W = WORD[LANG] || WORD.ru, [h, mi] = _hm(m);
+  return h ? (mi ? `${h} ${W.hs} ${mi} ${W.ms}` : `${h} ${W.hs}`) : `${mi} ${W.ms}`;
+};
+/** Компактная форма для осей и тепловой карты: «12.1 ч». */
+const fmtHrs = m => m==null ? "—"
+  : `${(Math.round(m/6)/10).toFixed(1)} ${(WORD[LANG]||WORD.ru).hs}`;
+const fmtHrsAx = m => `${Math.round(m/60)} ${(WORD[LANG]||WORD.ru).hs}`;
+/** «1 партия · 2 партии · 5 партий» */
+const nPart = n => LANG==="ru" ? plural(n, ["партия","партии","партий"]) : "partiya";
 const fmtDate = iso => { if(!iso) return "—"; const d=new Date(iso);
   return d.toLocaleString(LANG==="ru"?"ru-RU":"uz-UZ",{day:"2-digit",month:"2-digit",hour:"2-digit",minute:"2-digit"}); };
 const esc = s => String(s??"").replace(/[&<>"]/g,c=>({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;"}[c]));
@@ -674,7 +722,8 @@ function hbars(host, data, {value, label, color="--s1", fmt=(v=>v), tipHtml, ran
 }
 
 /** Диапазон min–max тонкой линией + точка среднего. Одна серия, без легенды. */
-function rangeDots(host, data, {lo, hi, mid, label, color="--s1", fmt=(v=>v), tipHtml}={}){
+function rangeDots(host, data, {lo, hi, mid, label, color="--s1", fmt=(v=>v), tickFmt, tipHtml}={}){
+  tickFmt = tickFmt || fmt;
   if(!data.length){ host.innerHTML = `<p class="empty">${t("none")}</p>`; return; }
   const rowH = 34, h = data.length*rowH + 40;
   const narrow = (host.clientWidth || 380) < 430;
@@ -687,7 +736,7 @@ function rangeDots(host, data, {lo, hi, mid, label, color="--s1", fmt=(v=>v), ti
   for(let i=0;i<=4;i++){
     const v = vmax*i/4, x = X(v);
     f.svg.append(el("line",{x1:x,x2:x,y1:f.y0,y2:f.y1,class:i?"g-line":"axis-line"}));
-    const tx = el("text",{x, y:f.y1+15, class:"tick","text-anchor":"middle"}); tx.textContent = fmt(v);
+    const tx = el("text",{x, y:f.y1+15, class:"tick","text-anchor":"middle"}); tx.textContent = tickFmt(v);
     f.svg.append(tx);
   }
   data.forEach((d,i)=>{
@@ -826,7 +875,7 @@ function render(){
   const k = DATA.kpi;
   $("#kpis").innerHTML = [
     tile(t("k_today"), k.batches_today, `${t("k_total")}: ${k.batches_total}`),
-    tile(t("k_avg"), k.avg_duration!=null ? fmtHm(k.avg_duration) : "—",
+    tile(t("k_avg"), k.avg_duration!=null ? fmtBig(k.avg_duration) : "—",
          `${t("k_med")}: ${k.median_duration!=null?fmtHm(k.median_duration):"—"}`),
     tile(t("k_def"), k.defect_rate!=null ? k.defect_rate+"%" : "—", `${k.defects} ${t("of")} ${k.graded}`,
          k.defect_rate!=null && k.defect_rate>5 ? "--critical" : null),
@@ -874,7 +923,7 @@ function renderHero(){
   box.innerHTML = `
     <div>
       <p class="big">${esc(t("hero_avg"))}</p>
-      <div class="num">${fmtHm(avg).replace(/(\d+)(\D+)/g,'$1<span>$2</span>')}</div>
+      <div class="num">${fmtBig(avg)}</div>
       <div class="under">${esc(t("k_med"))} ${fmtHm(k.median_duration)}</div>
     </div>
     <div>
@@ -900,9 +949,9 @@ function renderBoilers(){
   host.innerHTML = bs.map(b=>`
     <div class="bcard${String(b.id)===String(BOILER)?" sel":""}" data-b="${b.id}">
       <div class="bh"><b>${esc(boilerName(b))}</b><span>№${b.from}–${b.to}</span></div>
-      <div class="bv">${b.avg!=null?fmtHm(b.avg):"—"}</div>
+      <div class="bv">${b.avg!=null?fmtBig(b.avg):"—"}</div>
       <div class="bl">${esc(b.avg!=null ? t("bl_avg") : t("bl_none"))}</div>
-      <div class="brow"><span>${esc(t("bl_bat"))}</span><b>${b.batches}</b></div>
+      <div class="brow"><span>${esc(nPart(b.batches))}</span><b>${b.batches}</b></div>
       <div class="brow"><span>${esc(t("bl_inwork"))}</span><b>${b.in_work} / ${b.dryers}</b></div>
       <div class="brow"><span>${esc(t("bl_def"))}</span><b>${b.defects}${b.defect_rate!=null?` · ${b.defect_rate}%`:""}</b></div>
     </div>`).join("");
@@ -1004,7 +1053,7 @@ function renderDryers(){
       h.className = "bhead";
       h.innerHTML = `<b>${esc(boilerName(b))}</b>
         <span class="bnums">№${b.from}–${b.to}</span>
-        <span class="bmeta">${b.avg!=null?esc(t("bl_avg"))+" "+fmtHm(b.avg)+" · ":""}${b.batches} ${esc(t("bl_bat"))} · ${b.in_work}/${b.dryers} ${esc(t("bl_inwork"))}</span>`;
+        <span class="bmeta">${b.avg!=null?esc(t("bl_avg"))+" "+fmtHm(b.avg)+" · ":""}${b.batches} ${esc(nPart(b.batches))} · ${b.in_work}/${b.dryers} ${esc(t("bl_inwork"))}</span>`;
       box.append(h);
     }
     const pct = d.since_minutes!=null && d.expected_minutes
@@ -1018,7 +1067,7 @@ function renderDryers(){
       : (N.min && d.avg < N.min) ? `<span class="badge fastb">${t("b_fast")}</span>` : "";
     n.innerHTML = `
       <div class="n"><span>№${d.number}${d.boiler?`<i class="bch">${esc(t("boil_name")[0])}${d.boiler}</i>`:""}</span>${badge}</div>
-      <div class="hero-t">${d.last_duration!=null?fmtH(d.last_duration):"—"}</div>
+      <div class="hero-t">${d.last_duration!=null?fmtBig(d.last_duration):"—"}</div>
       <div class="hero-c">${d.last_duration!=null ? esc(t("last_cycle")) + (d.last_product?" · "+esc(d.last_product):"")
                                                   : esc(t("no_reports"))}</div>
       <div class="st" style="margin-top:8px"><span class="dot" style="background:${css(STATUS_COLOR[d.status])}"></span>
@@ -1045,7 +1094,7 @@ function renderDryers(){
 function renderCharts(){
   const P = DATA.products.filter(p=>p.avg!=null).slice(0,10);
   rangeDots($("#chProduct"), P, {
-    lo:p=>p.min, hi:p=>p.max, mid:p=>p.avg, label:p=>p.product, fmt:v=>fmtH(Math.round(v)),
+    lo:p=>p.min, hi:p=>p.max, mid:p=>p.avg, label:p=>p.product, fmt:v=>fmtHrs(v), tickFmt:v=>fmtHrsAx(v),
     tipHtml:p=>`<b>${esc(p.product)}</b><br>
       <span class="tk">${t("th_avg")}:</span> <b>${fmtHm(p.avg)}</b><br>
       <span class="tk">min–max:</span> <b>${fmtH(p.min)} – ${fmtH(p.max)}</b><br>
@@ -1103,7 +1152,7 @@ function renderCharts(){
   heatmap($("#chMatrix"), {
     rows:M.products, cols:usedDryers,
     get:(p,d)=> cellMap.get(p+"|"+d)?.avg ?? null,
-    fmt:v=>fmtH(Math.round(v)),
+    fmt:v=>fmtHrs(v),
     tipHtml:(p,d,v)=> v==null ? `<b>${esc(p)} · №${d}</b><br><span class="tk">${t("none")}</span>`
       : `<b>${esc(p)} · №${d}</b><br><span class="tk">${t("th_avg")}:</span> <b>${fmtHm(v)}</b><br>
          <span class="tk">${t("th_count")}:</span> <b>${cellMap.get(p+"|"+d).count}</b>`
@@ -1158,7 +1207,7 @@ function renderAll(){
     if(q && !`${r.product||""} ${r.operator||""} ${r.note||""} ${r.raw_text||""}`.toLowerCase().includes(q)) return false;
     return true;
   });
-  $("#tblCount").textContent = `${rows.length} ${t("batches")}`;
+  $("#tblCount").textContent = `${rows.length} ${nPart(rows.length)}`;
   $("#tblAll").innerHTML = rows.length ? `<table><thead><tr>
       <th>${t("th_dryer")}</th><th>${t("th_product")}</th><th>${t("th_dur")}</th><th>${t("th_fin")}</th>
       <th class="hide-sm">${t("th_t")}</th><th class="hide-sm">${t("th_h")}</th><th>${t("th_q")}</th>

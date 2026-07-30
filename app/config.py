@@ -42,6 +42,8 @@ VISION_ENABLED = bool(ANTHROPIC_API_KEY) and os.getenv("VISION_ENABLED", "1") !=
 # Ассистент в личке: свободные вопросы по цеху. Модель посильнее — тут язык и логика,
 # а не чтение семисегментных цифр.
 ASSISTANT_MODEL = os.getenv("ASSISTANT_MODEL", "claude-sonnet-4-5")
+# если основная модель перегружена — уходим на эту
+ASSISTANT_FALLBACK_MODEL = os.getenv("ASSISTANT_FALLBACK_MODEL", "claude-haiku-4-5")
 ASSISTANT_ENABLED = bool(ANTHROPIC_API_KEY) and os.getenv("ASSISTANT_ENABLED", "1") != "0"
 
 # ---------- Производство ----------

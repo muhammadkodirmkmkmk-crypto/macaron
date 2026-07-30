@@ -406,12 +406,8 @@ async def parse_with_vision(image_bytes: bytes, caption: str, media_type: str = 
                 ],
             }],
         )
-        try:
-            resp = await client.messages.create(temperature=0, **kwargs)
-        except Exception as exc:  # у новых моделей параметр temperature не принимается
-            if "temperature" not in str(exc):
-                raise
-            resp = await client.messages.create(**kwargs)
+        from . import claude
+        resp = await claude.create(client, **kwargs)
         text = "".join(b.text for b in resp.content if getattr(b, "type", "") == "text").strip()
         m = re.search(r"\{.*\}", text, re.S)
         data = json.loads(m.group(0) if m else text)

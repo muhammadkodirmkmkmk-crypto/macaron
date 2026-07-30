@@ -139,18 +139,41 @@ async def cmd_sushka(msg: Message):
 
 # ---------------------------------------------------------------- ассистент
 
+async def _typing_loop(bot: Bot, chat_id: int) -> None:
+    """Telegram гасит «печатает» через 5 секунд — держим, пока думаем."""
+    try:
+        while True:
+            await bot.send_chat_action(chat_id, "typing")
+            await asyncio.sleep(4)
+    except asyncio.CancelledError:
+        pass
+    except Exception:  # noqa: BLE001
+        pass
+
+
 async def _ask_assistant(msg: Message, question: str) -> None:
     """Свободный вопрос в личке: показываем «печатает», отвечаем текстом."""
     uid = msg.from_user.id if msg.from_user else 0
-    try:
-        await msg.bot.send_chat_action(msg.chat.id, "typing")
-    except Exception:  # noqa: BLE001
-        pass
+    ru = assistant.detect_lang(question) == "русский"
+    typing = asyncio.create_task(_typing_loop(msg.bot, msg.chat.id))
     try:
         text = await assistant.answer(uid, question)
     except Exception as exc:  # noqa: BLE001
         log.exception("ассистент упал: %s", exc)
-        return await msg.answer("Hozir javob bera olmadim, birozdan keyin urinib ko'ring.")
+        from . import claude as _claude
+        if _claude.is_overloaded(exc):
+            return await msg.answer(
+                "⏳ Сервис сейчас перегружен. Повторите вопрос через минуту."
+                if ru else
+                "⏳ Xizmat hozir band. Bir daqiqadan keyin qayta so'rang."
+            )
+        return await msg.answer(
+            "Не смог обработать вопрос. Попробуйте сформулировать иначе."
+            if ru else
+            "Savolni qayta ishlay olmadim. Boshqacha yozib ko'ring."
+        )
+    finally:
+        typing.cancel()
 
     for chunk in _split(text):
         try:

@@ -10,7 +10,7 @@ import json
 import logging
 import time
 
-from . import analytics, config
+from . import analytics, claude, config
 from .db import session
 
 log = logging.getLogger("assistant")
@@ -275,19 +275,15 @@ async def answer(uid: int, question: str) -> str:
     lang = detect_lang(question)
     used: list[str] = []
     for _ in range(6):
-        kwargs = dict(
+        resp = await claude.create(
+            client,
             model=config.ASSISTANT_MODEL,
+            fallback_model=config.ASSISTANT_FALLBACK_MODEL,
             max_tokens=2000,
             system=_system(lang),
             tools=TOOLS,
             messages=messages,
         )
-        try:
-            resp = await client.messages.create(temperature=0, **kwargs)
-        except Exception as exc:  # у новых моделей temperature не принимается
-            if "temperature" not in str(exc):
-                raise
-            resp = await client.messages.create(**kwargs)
 
         if resp.stop_reason != "tool_use":
             text = "".join(b.text for b in resp.content if getattr(b, "type", "") == "text").strip()

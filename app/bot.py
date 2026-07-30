@@ -59,7 +59,12 @@ async def cmd_start(msg: Message):
         "🌾 <b>Sana Bogatir</b> — quritish sexi\n\n"
         "Sushka hisobotlarini o'qib, dashboardga yig'aman.\n"
         "<b>Guruhda</b> ham, <b>shu yerda</b> ham ishlayman — farqi yo'q.\n\n"
-        "Odatdagidek yuboring: sushka rasmi + izoh\n"
+        "<b>Yangi format:</b>\n"
+        "<code>Start vaqt 23:26 qochqor</code> — partiya solindi\n"
+        "<code>Stop vaqt 08:26 qochqor</code> — chiqdi\n"
+        "Ikkalasini juftlab, sushka qancha ishlaganini o'zim hisoblayman.\n"
+        "Sushka raqamini yozsangiz aniqroq bo'ladi: <code>7 Start vaqt 23:26 qochqor</code>\n\n"
+        "Eski format ham ishlaydi: sushka rasmi + izoh\n"
         "<code>Burama 9 soat 30 minutda chiqdi</code>\n\n"
         "Rasmdan sushka raqamini va tablo ko'rsatkichlarini o'zim o'qiyman. "
         "Agar raqam ko'rinmasa — so'rayman, siz faqat raqam yuborasiz.\n\n"
@@ -176,6 +181,13 @@ async def _handle_load(msg: Message, bot: Bot, caption: str, has_photo: bool,
     remind = started + dt.timedelta(hours=config.LOAD_REMINDER_HOURS)
 
     async with session() as s:
+        # новый заход этой же сушки — старый явно недозакрыли, снимаем
+        if dryer:
+            for old in (await s.execute(select(LoadEvent).where(
+                LoadEvent.closed == False,  # noqa: E712
+                LoadEvent.dryer_number == dryer,
+            ))).scalars().all():
+                old.closed = True
         s.add(LoadEvent(
             chat_id=msg.chat.id, message_id=msg.message_id,
             dryer_number=dryer, product=product,
@@ -199,6 +211,132 @@ async def _handle_load(msg: Message, bot: Bot, caption: str, has_photo: bool,
             await msg.react([ReactionTypeEmoji(emoji="👌")])
         except Exception:  # noqa: BLE001
             pass
+
+
+MAX_PAIR_MINUTES = 30 * 60   # дольше 30 часов — значит, заход не тот
+
+
+def _pick_load(rows: list[LoadEvent], dryer: int | None, product: str | None) -> LoadEvent | None:
+    """Какой заход закрывает эта выгрузка. rows — открытые заходы, свежие первыми."""
+    if dryer:
+        same = [e for e in rows if e.dryer_number == dryer]
+        if same:
+            return same[0]
+    if product:
+        # тот же продукт: первым выходит тот, кого раньше заложили
+        same = [e for e in rows
+                if (e.product or "").lower() == product.lower()
+                and (not dryer or e.dryer_number in (None, dryer))]
+        if same:
+            return same[-1]
+    if not dryer and not product and len(rows) == 1:
+        return rows[0]
+    return None
+
+
+async def _handle_stop(msg: Message, bot: Bot, caption: str, has_photo: bool,
+                       hm, private: bool) -> bool:
+    """«Stop vaqt 22:46 burama» — ищем заход этой сушки и считаем, сколько она работала.
+
+    Возвращает True, если пара нашлась и партия записана. False — пусть сообщение
+    идёт по обычному пути разбора.
+    """
+    sent_at = (msg.date or dt.datetime.now(dt.timezone.utc)).astimezone(
+        dt.timezone.utc).replace(tzinfo=None)
+    sent_local = sent_at.replace(tzinfo=dt.timezone.utc).astimezone(config.TZ)
+
+    async with session() as s:
+        seen = (await s.execute(select(RawMessage.id).where(
+            RawMessage.chat_id == msg.chat.id, RawMessage.message_id == msg.message_id
+        ))).scalar_one_or_none()
+    if seen:
+        return True
+
+    dryer, product = await _dryer_from_photo(msg, bot, caption)
+    finished_local = parser.resolve_single(sent_local, hm)
+    finished = finished_local.astimezone(dt.timezone.utc).replace(tzinfo=None)
+
+    async with session() as s:
+        rows = (await s.execute(select(LoadEvent).where(
+            LoadEvent.closed == False  # noqa: E712
+        ).order_by(LoadEvent.started_at.desc()).limit(120))).scalars().all()
+        rows = [e for e in rows if e.chat_id == msg.chat.id or private or not config.ALLOWED_CHAT_IDS]
+        ev = _pick_load(rows, dryer, product)
+        duration = 0
+        if ev is not None:
+            started = ev.started_at
+            if finished <= started:
+                finished += dt.timedelta(days=1)   # заход вечером, выход утром
+                finished_local += dt.timedelta(days=1)
+            duration = round((finished - started).total_seconds() / 60)
+
+        if ev is None or duration <= 0 or duration > MAX_PAIR_MINUTES:
+            # новый формат Start/Stop — молча терять сообщение нельзя, спрашиваем
+            if not parser.START_STOP_RE.search(caption):
+                return False
+            head = f"№{dryer}" if dryer else (product or "")
+            await msg.reply(
+                f"🤔 <b>{head}</b> uchun «Start» xabarini topmadim.\n"
+                "Boshlangan vaqtini yozing: <code>Start vaqt 23:26 "
+                f"{(product or 'burama').lower()}</code>"
+            )
+            return True
+
+        dryer = dryer or ev.dryer_number
+        product = product or ev.product
+        parsed = parser.parse_text(caption)
+
+        s.add(RawMessage(
+            chat_id=msg.chat.id, message_id=msg.message_id,
+            user_id=msg.from_user.id if msg.from_user else None,
+            user_name=_uname(msg), text=caption, has_photo=has_photo,
+            photo_file_id=msg.photo[-1].file_id if has_photo else None,
+            sent_at=sent_at, processed=True,
+        ))
+        batch = Batch(
+            dryer_number=dryer, product=product,
+            duration_minutes=duration,
+            started_at=started, finished_at=finished,
+            quality=parsed.quality, note=parsed.note,
+            raw_text=f"{ev.raw_text or ''} || {caption}".strip(" |"),
+            source="pair", confidence=0.9 if dryer else 0.6,
+            needs_review=dryer is None,
+            chat_id=msg.chat.id, message_id=msg.message_id,
+            user_id=msg.from_user.id if msg.from_user else None,
+            user_name=_uname(msg),
+            photo_file_id=msg.photo[-1].file_id if has_photo else None,
+        )
+        s.add(batch)
+        await s.flush()
+        batch_id = batch.id
+        ev.closed = True
+        ev.closed_batch_id = batch_id
+        if dryer and not ev.dryer_number:
+            ev.dryer_number = dryer
+        await s.commit()
+
+    st_local = started.replace(tzinfo=dt.timezone.utc).astimezone(config.TZ)
+    head = f"Sushka <b>№{dryer}</b>" if dryer else "Sushka"
+    text = (
+        f"✅ <b>{head} ishladi: {_fmt_dur(duration)}</b>\n"
+        f"{('🍝 ' + product + chr(10)) if product else ''}"
+        f"⏱ {st_local:%H:%M} → {finished_local:%H:%M}"
+    )
+    abnormal = not (config.NORM_MIN_MINUTES <= duration <= config.NORM_MAX_MINUTES)
+    if abnormal:
+        text += (f"\n⚠️ me'yordan chetda "
+                 f"({config.NORM_MIN_MINUTES//60}–{config.NORM_MAX_MINUTES//60} soat)")
+
+    sent = await (msg.answer(text) if private else msg.reply(text))
+    if dryer is None:
+        ask = await sent.reply(
+            f"🤔 Qaysi sushka? Javob qilib <b>raqam</b> yuboring (1–{config.DRYER_COUNT})."
+        )
+        async with session() as s:
+            s.add(Pending(chat_id=msg.chat.id, ask_message_id=ask.message_id, batch_id=batch_id))
+            await s.commit()
+    log.info("пара start→stop: сушка %s, %s, %s мин", dryer, product, duration)
+    return True
 
 
 async def _close_loads(s, chat_id: int | None, dryer: int | None, batch_id: int) -> None:
@@ -433,10 +571,15 @@ async def on_report_message(msg: Message, bot: Bot):
     has_photo = bool(msg.photo)
     if not has_photo and not caption:
         return
-    # «00:28 kirdi burama» — партию заложили, выхода ещё нет
+    # «Start vaqt 23:26 qochqor» / «00:28 kirdi burama» — партию заложили, выхода ещё нет
     load_hm = parser.parse_load_only(caption)
     if load_hm is not None and config.LOAD_REMINDER_ENABLED:
         return await _handle_load(msg, bot, caption, has_photo, load_hm, private)
+
+    # «Stop vaqt 22:46 burama» — выгрузка отдельным сообщением: ищем её заход
+    stop_hm = parser.parse_stop_only(caption)
+    if stop_hm is not None and await _handle_stop(msg, bot, caption, has_photo, stop_hm, private):
+        return
 
     if not parser.is_report_message(caption, has_photo):
         # в личке всё, что не отчёт, — это вопрос к ассистенту

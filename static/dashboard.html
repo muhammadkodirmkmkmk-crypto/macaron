@@ -139,6 +139,7 @@ h2{font-size:14px;font-weight:650;margin:0 0 4px;letter-spacing:.01em}
   font-variant-numeric:tabular-nums}
 .dry .hero-c{font-size:11.5px;color:var(--ink-muted)}
 .dry .st{display:inline-flex;align-items:center;gap:5px;font-size:11.5px;color:var(--ink-2);margin-top:2px}
+.dry .n i.bch{font-style:normal;font-size:10px;color:var(--ink-muted);font-weight:600;margin-left:5px}
 .dot{width:9px;height:9px;border-radius:50%;flex:none;box-shadow:0 0 0 2px var(--surface-1)}
 .dry .row{display:flex;justify-content:space-between;gap:6px;font-size:11.5px;color:var(--ink-2);margin-top:7px;align-items:baseline}
 .dry .row>span{white-space:nowrap;overflow:hidden;text-overflow:ellipsis;min-width:0}
@@ -146,6 +147,28 @@ h2{font-size:14px;font-weight:650;margin:0 0 4px;letter-spacing:.01em}
 .dry .bar{height:4px;border-radius:2px;background:var(--grid);margin-top:8px;overflow:hidden}
 .dry .bar i{display:block;height:100%;border-radius:2px;background:var(--s1)}
 .dry.nodata{opacity:.55}
+
+/* котлы */
+.bhead{grid-column:1/-1;display:flex;align-items:baseline;gap:10px;flex-wrap:wrap;
+  margin:16px 0 0;padding-top:13px;border-top:1px solid var(--border)}
+.bhead:first-child{margin-top:0;padding-top:0;border-top:0}
+.bhead b{font-size:15.5px;font-weight:670;letter-spacing:-.01em}
+.bhead .bnums{font-size:11.5px;color:var(--ink-2);border:1px solid var(--border);
+  border-radius:7px;padding:1px 7px;white-space:nowrap}
+.bhead .bmeta{font-size:12px;color:var(--ink-muted);margin-left:auto;text-align:right}
+.boilers{display:grid;grid-template-columns:repeat(auto-fit,minmax(230px,1fr));gap:12px}
+.bcard{background:var(--surface-1);border:1px solid var(--border);border-radius:var(--radius);
+  padding:14px 16px;cursor:pointer;transition:transform .08s ease}
+.bcard:hover{transform:translateY(-1px);border-color:var(--axis)}
+.bcard.sel{border-color:var(--s1);box-shadow:0 0 0 1px var(--s1) inset}
+.bcard .bh{display:flex;align-items:baseline;justify-content:space-between;gap:8px}
+.bcard .bh b{font-size:14.5px;font-weight:660}
+.bcard .bh span{font-size:11.5px;color:var(--ink-muted)}
+.bcard .bv{font-size:27px;font-weight:640;letter-spacing:-.02em;line-height:1.15;margin:7px 0 1px;
+  font-variant-numeric:tabular-nums}
+.bcard .bl{font-size:12px;color:var(--ink-2)}
+.bcard .brow{display:flex;justify-content:space-between;font-size:11.5px;color:var(--ink-2);margin-top:8px}
+.bcard .brow b{color:var(--ink-1);font-variant-numeric:tabular-nums}
 
 .cards{display:grid;grid-template-columns:repeat(auto-fit,minmax(380px,1fr));gap:14px}
 .card{background:var(--surface-1);border:1px solid var(--border);border-radius:var(--radius);padding:16px 16px 10px;min-width:0;overflow:hidden}
@@ -300,6 +323,12 @@ dialog::backdrop{background:rgba(0,0,0,.45)}
   </section>
 
   <section>
+    <h2 data-i="boil_h">Котлы</h2>
+    <p class="hint" data-i="boil_hint">Сушки разделены по котлам. Нажмите на котёл — ниже останутся только его сушки.</p>
+    <div class="boilers" id="boilers"></div>
+  </section>
+
+  <section>
     <h2 data-i="rank_h">Сколько сушит каждый аппарат</h2>
     <p class="hint" data-i="rank_hint">Отсортировано от самых медленных к самым быстрым. Пунктир — среднее по цеху; всё, что правее него, сушит дольше остальных.</p>
     <div class="card wide" style="padding:16px 18px 14px"><div id="rank"></div></div>
@@ -309,6 +338,8 @@ dialog::backdrop{background:rgba(0,0,0,.45)}
     <h2 data-i="dryers_h">Сушки — текущее состояние</h2>
     <p class="hint" data-i="dryers_hint">Статус оценивается по времени с последнего отчёта относительно среднего цикла этой сушки. Нажмите на карточку — история партий.</p>
     <div class="sortbar no-print">
+      <span class="muted" style="font-size:12.5px" data-i="boil_label">Котёл:</span>
+      <select id="boilerSel"></select>
       <span class="muted" style="font-size:12.5px" data-i="sort_label">Порядок:</span>
       <select id="drySort">
         <option value="num" data-i="sort_num">по номеру</option>
@@ -409,6 +440,11 @@ const I18N = {
     hero_avg:"в среднем по цеху", hero_none:"Пока нет ни одной завершённой партии — как только в группу придёт первый отчёт, здесь появятся цифры.",
     hero_fast:"Быстрее всех", hero_slow:"Медленнее всех", hero_spread:"Разброс по цеху", hero_norm:"Норма",
     hero_hint:"Сводка по цеху: кто быстрее, кто медленнее и насколько.",
+    boil_h:"Котлы",
+    boil_hint:"Сушки разделены по котлам. Нажмите на котёл — ниже останутся только его сушки.",
+    boil_label:"Котёл:", boil_all:"Все котлы", boil_name:"Котёл",
+    bl_avg:"среднее время сушки", bl_inwork:"сейчас сушится", bl_dryers:"сушек",
+    bl_bat:"партий", bl_def:"брак", bl_none:"нет данных",
     rank_h:"Сколько сушит каждый аппарат",
     rank_hint:"Отсортировано от самых медленных к самым быстрым. Пунктир — среднее по цеху; всё, что правее него, сушит дольше остальных.",
     rank_avgline:"среднее по цеху",
@@ -450,6 +486,11 @@ const I18N = {
     hero_avg:"sex bo'yicha o'rtacha", hero_none:"Hali bitta ham tugagan partiya yo'q — guruhga birinchi hisobot kelishi bilan raqamlar paydo bo'ladi.",
     hero_fast:"Eng tez", hero_slow:"Eng sekin", hero_spread:"Sex bo'yicha tarqalish", hero_norm:"Me'yor",
     hero_hint:"Sex bo'yicha xulosa: kim tezroq, kim sekinroq va qancha farq bilan.",
+    boil_h:"Qozonlar",
+    boil_hint:"Sushkalar qozonlarga bo'lingan. Qozonni bosing — pastda faqat uning sushkalari qoladi.",
+    boil_label:"Qozon:", boil_all:"Barcha qozonlar", boil_name:"Qozon",
+    bl_avg:"o'rtacha quritish vaqti", bl_inwork:"hozir quriyapti", bl_dryers:"sushka",
+    bl_bat:"partiya", bl_def:"brak", bl_none:"ma'lumot yo'q",
     rank_h:"Har bir sushka qancha quritadi",
     rank_hint:"Eng sekinlaridan tezlariga qarab tartiblangan. Punktir — sex o'rtachasi; undan o'ngdagilar boshqalardan uzoqroq quritadi.",
     rank_avgline:"sex o'rtachasi",
@@ -754,6 +795,7 @@ function heatmap(host, {rows, cols, get, fmt, tipHtml}){
 /* ------------------------------------------------------------------ state */
 let DAYS = +(localStorage.getItem("days")||7);
 let DATA = null;
+let BOILER = localStorage.getItem("boiler") || "";   // "" = все котлы
 
 async function load(){
   $("#error").innerHTML = "";
@@ -777,6 +819,7 @@ function render(){
   $("#langBtn").textContent = LANG==="ru" ? "UZ" : "RU";
   $("#exportBtn").href = `/api/export.xlsx?days=${DAYS}`;
 
+  renderBoilers();
   renderHero();
   renderRank();
 
@@ -845,9 +888,43 @@ function renderHero(){
     </div>`;
 }
 
+/* ---- котлы: 1–12, 13–22, 23–31 ---- */
+const boilerName = b => `${t("boil_name")} ${b.id}`;
+const inBoiler = d => !BOILER || d.boiler === +BOILER;
+
+function renderBoilers(){
+  const bs = DATA.boilers || [];
+  const host = $("#boilers");
+  if (!bs.length){ host.innerHTML = ""; return; }
+
+  host.innerHTML = bs.map(b=>`
+    <div class="bcard${String(b.id)===String(BOILER)?" sel":""}" data-b="${b.id}">
+      <div class="bh"><b>${esc(boilerName(b))}</b><span>№${b.from}–${b.to}</span></div>
+      <div class="bv">${b.avg!=null?fmtHm(b.avg):"—"}</div>
+      <div class="bl">${esc(b.avg!=null ? t("bl_avg") : t("bl_none"))}</div>
+      <div class="brow"><span>${esc(t("bl_bat"))}</span><b>${b.batches}</b></div>
+      <div class="brow"><span>${esc(t("bl_inwork"))}</span><b>${b.in_work} / ${b.dryers}</b></div>
+      <div class="brow"><span>${esc(t("bl_def"))}</span><b>${b.defects}${b.defect_rate!=null?` · ${b.defect_rate}%`:""}</b></div>
+    </div>`).join("");
+
+  host.querySelectorAll(".bcard").forEach(n=>{
+    n.addEventListener("click", ()=>{
+      BOILER = String(BOILER)===n.dataset.b ? "" : n.dataset.b;
+      localStorage.setItem("boiler", BOILER);
+      renderBoilers(); renderRank(); renderDryers(); renderAll();
+      $("#dryers").scrollIntoView({behavior:"smooth", block:"start"});
+    });
+  });
+
+  const sel = $("#boilerSel");
+  sel.innerHTML = `<option value="">${esc(t("boil_all"))}</option>` +
+    bs.map(b=>`<option value="${b.id}">${esc(boilerName(b))} · №${b.from}–${b.to}</option>`).join("");
+  sel.value = BOILER;
+}
+
 /* ---- рейтинг: кто сушит дольше ---- */
 function renderRank(){
-  const rows = DATA.dryers.filter(d => d.avg != null).sort((a,b)=>b.avg-a.avg);
+  const rows = DATA.dryers.filter(d => d.avg != null && inBoiler(d)).sort((a,b)=>b.avg-a.avg);
   const host = $("#rank");
   if (!rows.length){ host.innerHTML = `<p class="empty">${t("none")}</p>`; return; }
   const max = Math.max(...rows.map(d=>d.avg)) * 1.02;
@@ -909,14 +986,27 @@ function renderDryers(){
     `<span><i style="background:${css(STATUS_COLOR[s])};border-radius:50%"></i>${esc(t("st_"+s))}</span>`).join("");
 
   const mode = $("#drySort").value;
-  const list = [...DATA.dryers];
+  const list = DATA.dryers.filter(inBoiler);
   const rank = v => v==null ? -Infinity : v;
   if (mode==="slow")   list.sort((a,b)=>rank(b.avg)-rank(a.avg));
   if (mode==="fast")   list.sort((a,b)=>(a.avg==null)-(b.avg==null) || rank(a.avg)-rank(b.avg));
   if (mode==="recent") list.sort((a,b)=>(a.since_minutes==null)-(b.since_minutes==null)
                                         || (a.since_minutes||0)-(b.since_minutes||0));
 
+  // без фильтра и при обычном порядке — раскладываем по котлам с заголовками
+  const heads = (!BOILER && mode==="num") ? (DATA.boilers||[]) : [];
+  let head = 0;
+
   list.forEach(d=>{
+    while (head < heads.length && d.number >= heads[head].from){
+      const b = heads[head++];
+      const h = document.createElement("div");
+      h.className = "bhead";
+      h.innerHTML = `<b>${esc(boilerName(b))}</b>
+        <span class="bnums">№${b.from}–${b.to}</span>
+        <span class="bmeta">${b.avg!=null?esc(t("bl_avg"))+" "+fmtHm(b.avg)+" · ":""}${b.batches} ${esc(t("bl_bat"))} · ${b.in_work}/${b.dryers} ${esc(t("bl_inwork"))}</span>`;
+      box.append(h);
+    }
     const pct = d.since_minutes!=null && d.expected_minutes
       ? Math.min(100, Math.round(100*d.since_minutes/d.expected_minutes)) : 0;
     const n = document.createElement("div");
@@ -927,7 +1017,7 @@ function renderDryers(){
       : (N.max && d.avg > N.max) ? `<span class="badge slow">${t("b_slow")}</span>`
       : (N.min && d.avg < N.min) ? `<span class="badge fastb">${t("b_fast")}</span>` : "";
     n.innerHTML = `
-      <div class="n"><span>№${d.number}</span>${badge}</div>
+      <div class="n"><span>№${d.number}${d.boiler?`<i class="bch">${esc(t("boil_name")[0])}${d.boiler}</i>`:""}</span>${badge}</div>
       <div class="hero-t">${d.last_duration!=null?fmtH(d.last_duration):"—"}</div>
       <div class="hero-c">${d.last_duration!=null ? esc(t("last_cycle")) + (d.last_product?" · "+esc(d.last_product):"")
                                                   : esc(t("no_reports"))}</div>
@@ -940,7 +1030,7 @@ function renderDryers(){
         <b>${d.temperature!=null? d.temperature+"°":"—"}${d.humidity!=null? " · "+d.humidity+"%":""}</b></div>
       <div class="bar"><i style="width:${pct}%;background:${css(STATUS_COLOR[d.status])}"></i></div>`;
     onTip(n, e=>showTip(e,
-      `<b>Сушка №${d.number}</b><br>
+      `<b>${esc(t("th_dryer"))} №${d.number}</b>${d.boiler?` · <span class="tk">${esc(t("boil_name"))} ${d.boiler}</span>`:""}<br>
        <span class="tk">${t("th_count")}:</span> <b>${d.batches}</b><br>
        <span class="tk">${t("th_avg")}:</span> <b>${d.avg!=null?fmtHm(d.avg):"—"}</b><br>
        <span class="tk">min/max:</span> <b>${d.min!=null?fmtH(d.min):"—"} / ${d.max!=null?fmtH(d.max):"—"}</b><br>
@@ -1060,6 +1150,7 @@ function renderAll(){
   const fd = $("#fDryer").value, fp = $("#fProduct").value, fq = $("#fQuality").value;
   const fr = $("#fReview").checked;
   const rows = DATA.recent.filter(r=>{
+    if(BOILER && r.boiler !== +BOILER) return false;
     if(fd && String(r.dryer)!==fd) return false;
     if(fp && r.product!==fp) return false;
     if(fq && r.quality!==fq) return false;
@@ -1089,7 +1180,7 @@ function renderAll(){
 function openDryer(n){
   const d = DATA.dryers.find(x=>x.number===n);
   const rows = DATA.recent.filter(r=>r.dryer===n).slice(0,40);
-  $("#dlgTitle").textContent = `${t("th_dryer")} №${n}`;
+  $("#dlgTitle").textContent = `${t("th_dryer")} №${n}` + (d && d.boiler ? ` · ${t("boil_name")} ${d.boiler}` : "");
   $("#dlgBody").innerHTML = `
     <div class="kpis" style="grid-template-columns:repeat(auto-fit,minmax(120px,1fr))">
       ${tile(t("th_count"), d.batches, "")}
@@ -1153,6 +1244,10 @@ dlg.addEventListener("click", e => { if (e.target === dlg) dlg.close(); });  // 
 $("#refreshBtn").onclick = load;
 $("#drySort").addEventListener("change", ()=>{ localStorage.setItem("drySort", $("#drySort").value); renderDryers(); });
 $("#drySort").value = localStorage.getItem("drySort") || "num";
+$("#boilerSel").addEventListener("change", ()=>{
+  BOILER = $("#boilerSel").value; localStorage.setItem("boiler", BOILER);
+  renderBoilers(); renderRank(); renderDryers(); renderAll();
+});
 $("#langBtn").onclick = ()=>{ LANG = LANG==="ru"?"uz":"ru"; localStorage.setItem("lang",LANG); render(); };
 $("#themeBtn").onclick = ()=>{
   const cur = document.documentElement.dataset.theme;

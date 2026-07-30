@@ -49,10 +49,39 @@ ASSISTANT_ENABLED = bool(ANTHROPIC_API_KEY) and os.getenv("ASSISTANT_ENABLED", "
 # ---------- Производство ----------
 DRYER_COUNT = _int("DRYER_COUNT", 31)
 
+
+def _ranges(name: str, default: str) -> list[tuple[int, int, int]]:
+    """'1-12,13-22,23-31' -> [(1,1,12), (2,13,22), (3,23,31)]."""
+    out: list[tuple[int, int, int]] = []
+    for i, part in enumerate((os.getenv(name, "") or default).split(","), 1):
+        part = part.strip()
+        if not part:
+            continue
+        a, _, b = part.partition("-")
+        try:
+            lo, hi = int(a), int(b or a)
+        except ValueError:
+            continue
+        out.append((i, min(lo, hi), max(lo, hi)))
+    return out
+
+
+# Котлы (qozon): сушки сгруппированы по котлам, к которым подключены.
+BOILER_RANGES = _ranges("BOILERS", "1-12,13-22,23-31")
+
+
+def boiler_of(n: int | None) -> int | None:
+    if not n:
+        return None
+    for i, lo, hi in BOILER_RANGES:
+        if lo <= n <= hi:
+            return i
+    return None
+
 # Известные виды макарон. Парсер сначала ищет их, потом отдаёт текст модели.
 KNOWN_PRODUCTS = _csv("PRODUCTS") or [
     "Burama", "Pero", "Pautinka", "Spiral", "Rojok", "Rakushka", "Zirak",
-    "Zvezda", "Vermishel", "Lapsha", "Bantik", "Nay", "Gulcha",
+    "Qochqor", "Zvezda", "Vermishel", "Lapsha", "Bantik", "Nay", "Gulcha",
     "Yulduzcha", "Qalampir", "Cho'p", "Uzun", "Qisqa", "Trubka",
 ]
 
@@ -60,6 +89,8 @@ KNOWN_PRODUCTS = _csv("PRODUCTS") or [
 PRODUCT_ALIASES = {
     "burama": "Burama", "борама": "Burama", "burma": "Burama",
     "zirak": "Zirak", "зирак": "Zirak", "zirek": "Zirak", "ziyrak": "Zirak",
+    "qochqor": "Qochqor", "kochkor": "Qochqor", "qo'chqor": "Qochqor",
+    "qochkor": "Qochqor", "кочкор": "Qochqor", "качкор": "Qochqor",
     "pero": "Pero", "перо": "Pero", "pyero": "Pero",
     "pautinka": "Pautinka", "паутинка": "Pautinka", "poutinka": "Pautinka",
     "pautunka": "Pautinka", "pavtinka": "Pautinka",

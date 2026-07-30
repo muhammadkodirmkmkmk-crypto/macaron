@@ -70,6 +70,54 @@ def check_load() -> int:
     return bad
 
 
+STOP_CASES = [
+    # новый формат цеха: старт и стоп — разными сообщениями
+    ("Stop vaqt 22:46 burama",          (22, 46)),
+    ("Stop vaqt 23:34 zirak",           (23, 34)),
+    ("12 Stop vaqt 08:15 qochqor",      (8, 15)),
+    ("Start vaqt 23:26 qochqor",        None),   # это заход, не выход
+    ("Burama 9 soat 30 minutda chiqdi", None),   # длительность написана прямо
+    ("00:28 kirgan 10:30 chiqdi burama", None),  # заход и выход в одном сообщении
+    ("zor zor",                         None),
+]
+
+START_CASES = [
+    ("Start vaqt 23:26 qochqor",  (23, 26), "Qochqor", None),
+    ("Start vaqt 00:05 burama",   (0, 5),   "Burama",  None),
+    ("7 Start vaqt 14:10 pero",   (14, 10), "Pero",    7),
+    ("Stop vaqt 22:46 burama",    None,     "Burama",  None),
+]
+
+
+def check_startstop() -> int:
+    bad = 0
+    for text, exp in STOP_CASES:
+        got = P.parse_stop_only(text)
+        ok = got == exp
+        bad += not ok
+        print(f"{'✓' if ok else '✗'} выгрузка: {text[:38]:40} -> {got}")
+    print()
+    for text, exp_hm, exp_prod, exp_dryer in START_CASES:
+        hm = P.parse_load_only(text)
+        p = P.parse_text(text)
+        ok = hm == exp_hm and p.product == exp_prod and p.dryer_number == exp_dryer
+        bad += not ok
+        print(f"{'✓' if ok else '✗'} заход:    {text[:38]:40} -> {hm} / {p.product} / №{p.dryer_number}")
+    return bad
+
+
+def check_boilers() -> int:
+    from app import config
+    expect = {1: 1, 12: 1, 13: 2, 22: 2, 23: 3, 31: 3, 32: None, None: None}
+    bad = 0
+    for n, b in expect.items():
+        got = config.boiler_of(n)
+        ok = got == b
+        bad += not ok
+        print(f"{'✓' if ok else '✗'} котёл: сушка {n} -> {got}")
+    return bad
+
+
 def main() -> int:
     bad = 0
     for text, prod, mins, qual in CASES:
@@ -91,6 +139,12 @@ def main() -> int:
 
     print()
     bad += check_load()
+
+    print()
+    bad += check_startstop()
+
+    print()
+    bad += check_boilers()
 
     print(f"\n{'ВСЁ ОК' if not bad else f'ОШИБОК: {bad}'}")
     return 1 if bad else 0

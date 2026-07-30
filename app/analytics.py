@@ -122,6 +122,7 @@ def dryers(batches: list[Batch]) -> list[dict]:
 
         out.append({
             "number": n,
+            "boiler": config.boiler_of(n),
             "status": status,
             "batches": len(rows),
             "avg": s["avg"],
@@ -140,6 +141,36 @@ def dryers(batches: list[Batch]) -> list[dict]:
             "defects": len(defects),
             "defect_rate": round(100 * len(defects) / len(graded), 1) if graded else None,
             "operators": sorted({b.user_name for b in rows if b.user_name})[:4],
+        })
+    return out
+
+
+def boilers(dryer_cards: list[dict], batches: list[Batch]) -> list[dict]:
+    """Котлы: 1–12, 13–22, 23–31. Сушки сгруппированы по котлу, к которому подключены."""
+    out = []
+    for i, lo, hi in config.BOILER_RANGES:
+        rows = [b for b in batches if b.dryer_number and lo <= b.dryer_number <= hi]
+        cards = [d for d in dryer_cards if lo <= d["number"] <= hi]
+        durs = [b.duration_minutes for b in rows if b.duration_minutes]
+        graded = [b for b in rows if b.quality in ("ok", "defect")]
+        defects = [b for b in graded if b.quality == "defect"]
+        last = max((b.finished_at for b in rows), default=None)
+        out.append({
+            "id": i,
+            "from": lo,
+            "to": hi,
+            "dryers": len(cards),
+            "batches": len(rows),
+            "avg": round(st.mean(durs)) if durs else None,
+            "median": round(st.median(durs)) if durs else None,
+            "min": min(durs) if durs else None,
+            "max": max(durs) if durs else None,
+            "total_minutes": sum(durs),
+            "in_work": len([d for d in cards if d.get("status") == "in_work"]),
+            "active": len({b.dryer_number for b in rows if b.dryer_number}),
+            "defects": len(defects),
+            "defect_rate": round(100 * len(defects) / len(graded), 1) if graded else None,
+            "last_finished_at": to_local(last).isoformat() if last else None,
         })
     return out
 
@@ -287,6 +318,7 @@ async def dryer_report(s: AsyncSession, number: int, days: int) -> dict:
     prod = by_product(rows)
     return {
         "dryer": number,
+        "boiler": config.boiler_of(number),
         "days": days,
         "batches": info["batches"],
         "avg_minutes": info["avg"],
@@ -321,6 +353,7 @@ def serialize(b: Batch) -> dict:
     return {
         "id": b.id,
         "dryer": b.dryer_number,
+        "boiler": config.boiler_of(b.dryer_number),
         "product": b.product,
         "duration": b.duration_minutes,
         "started_at": to_local(b.started_at).isoformat() if b.started_at else None,
@@ -374,6 +407,7 @@ async def dashboard_payload(s: AsyncSession, days: int = 30) -> dict:
         "norm": {"min": config.NORM_MIN_MINUTES, "max": config.NORM_MAX_MINUTES},
         "kpi": kpi(batches, days),
         "dryers": ds,
+        "boilers": boilers(ds, batches),
         "products": by_product(batches),
         "timeline": timeline(batches, min(days, 60)),
         "hours": hour_histogram(batches),

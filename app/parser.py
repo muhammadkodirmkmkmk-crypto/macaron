@@ -38,13 +38,18 @@ CLOCK_TOKEN_RE = re.compile(r"(?<![\d:.])(\d{1,2})\s*[:.\-]\s*(\d{2})(?![\d:.])"
 # то есть партию заложили и процесс пошёл. В цехе пишут именно так.
 IN_WORDS_RE = re.compile(
     r"(?:kirgan|kirdi|kirib|kirgizildi|kiritildi|solindi|solingan|qo['’]yildi|boshlandi|"
-    r"yopildi|yopdi|yopdim|yopilgan|yopib|yopti|"
+    r"yopildi|yopdi|yopdim|yopilgan|yopib|yopti|start\w*|"
     r"зашл\w*|заложен\w*|заложил\w*|поставил\w*|начал\w*|старт\w*|вход\w*|закрыл\w*)", re.I | re.U)
 # Слова о КОНЦЕ сушки. «ochildi» — «открыли» дверь, то есть выгрузили.
 OUT_WORDS_RE = re.compile(
     r"(?:chiqdi|chiqti|chiqqan|chiqarildi|olindi|tugadi|"
-    r"ochildi|ochdi|ochilgan|ochib|"
+    r"ochildi|ochdi|ochilgan|ochib|stop\w*|стоп\w*|"
     r"вышл\w*|снял\w*|снят\w*|готов\w*|выгруз\w*|открыл\w*|конец|финиш)", re.I | re.U)
+
+# Новый формат цеха: «Start vaqt 23:26 qochqor» / «Stop vaqt 22:46 burama»
+START_STOP_RE = re.compile(r"(?:\bstart\b|\bstop\b|\bстарт\w*|\bстоп\w*)", re.I | re.U)
+BARE_NUM_RE = re.compile(r"(?<![\d:.\-])(\d{1,2})(?![\d:.\-])")
+UNIT_AFTER_RE = re.compile(r"\s*(?:soat|soa|min|daq|час|ч\b|мин)", re.I | re.U)
 
 
 def _clock_pairs(text: str):
@@ -125,6 +130,50 @@ def parse_load_only(text: str) -> tuple[int, int] | None:
 
 def is_load_message(text: str) -> bool:
     return parse_load_only(text or "") is not None
+
+
+def parse_stop_only(text: str) -> tuple[int, int] | None:
+    """«Stop vaqt 22:46 burama» — партию выгрузили, а заход был отдельным сообщением.
+
+    Возвращает час:мин выгрузки, (-1,-1) если времени нет (считаем от момента
+    сообщения) и None, если это не «голая» выгрузка: есть слово о заходе,
+    написана длительность («9 soat 30 minutda chiqdi») или отметок времени больше одной.
+    """
+    if not text:
+        return None
+    if not OUT_WORDS_RE.search(text):
+        return None
+    if IN_WORDS_RE.search(text):
+        return None
+    if HOUR_RE.search(text) or MIN_RE.search(text):
+        return None            # длительность написана прямо — это самодостаточный отчёт
+    times = _clock_pairs(text)
+    if len(times) > 1:
+        return None
+    if not times:
+        return (-1, -1)
+    return times[0][0], times[0][1]
+
+
+def dryer_hint(text: str) -> int | None:
+    """Номер сушки из текста: «12-sushka», «№12», а в формате Start/Stop —
+    любое отдельно стоящее число (часы туда не попадают, единицы времени отсекаем)."""
+    if not text:
+        return None
+    m = DRYER_IN_TEXT_RE.search(text)
+    if m:
+        n = int(m.group(1))
+        if 1 <= n <= config.DRYER_COUNT:
+            return n
+    if not START_STOP_RE.search(text):
+        return None
+    for m in BARE_NUM_RE.finditer(text):
+        if UNIT_AFTER_RE.match(text[m.end():m.end() + 8]):
+            continue
+        n = int(m.group(1))
+        if 1 <= n <= config.DRYER_COUNT:
+            return n
+    return None
 
 
 def resolve_single(sent_local: dt.datetime, hm) -> dt.datetime:
@@ -262,11 +311,7 @@ def parse_text(text: str) -> Parsed:
     else:
         p.duration_minutes = _duration_from_text(clean)
 
-    d = DRYER_IN_TEXT_RE.search(clean)
-    if d:
-        n = int(d.group(1))
-        if 1 <= n <= config.DRYER_COUNT:
-            p.dryer_number = n
+    p.dryer_number = dryer_hint(clean)
 
     # Заметка = остаток текста после вырезания понятых кусков
     note = clean
@@ -299,6 +344,8 @@ def is_report_message(text: str, has_photo: bool) -> bool:
         return True  # фото без подписи — попробуем распознать
     t = text or ""
     if DONE_RE.search(t):
+        return True
+    if START_STOP_RE.search(t) and _clock_pairs(t):
         return True
     if HOUR_RE.search(t) and (_match_product(t) or has_photo):
         return True

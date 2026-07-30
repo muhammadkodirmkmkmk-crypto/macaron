@@ -225,12 +225,13 @@ button:active{opacity:.85}
 
         ws = wb.active
         ws.title = "Partiyalar"
-        cols = ["ID", "Sushka", "Mahsulot", "Vaqt (min)", "Vaqt (soat)", "Boshlandi",
+        cols = ["ID", "Sushka", "Qozon", "Mahsulot", "Vaqt (min)", "Vaqt (soat)", "Boshlandi",
                 "Tugadi", "t°", "Namlik", "Sifat", "Izoh", "Operator", "Ishonch", "Xabar matni"]
         ws.append(cols)
         for b in batches:
             ws.append([
-                b.id, b.dryer_number, b.product, b.duration_minutes,
+                b.id, b.dryer_number, config.boiler_of(b.dryer_number),
+                b.product, b.duration_minutes,
                 round(b.duration_minutes / 60, 2) if b.duration_minutes else None,
                 analytics.to_local(b.started_at).replace(tzinfo=None) if b.started_at else None,
                 analytics.to_local(b.finished_at).replace(tzinfo=None),
@@ -238,17 +239,26 @@ button:active{opacity:.85}
                 b.confidence, b.raw_text,
             ])
         style_head(ws, len(cols))
-        for i, w in enumerate([6, 8, 14, 11, 11, 18, 18, 8, 9, 10, 26, 18, 9, 40], 1):
+        for i, w in enumerate([6, 8, 8, 14, 11, 11, 18, 18, 8, 9, 10, 26, 18, 9, 40], 1):
             ws.column_dimensions[ws.cell(row=1, column=i).column_letter].width = w
 
         ws2 = wb.create_sheet("Sushkalar")
-        ws2.append(["Sushka", "Partiyalar", "O'rtacha (min)", "Mediana", "Min", "Maks",
+        ws2.append(["Sushka", "Qozon", "Partiyalar", "O'rtacha (min)", "Mediana", "Min", "Maks",
                     "Global farq", "Brak", "Brak %", "Holat", "Oxirgi mahsulot", "Oxirgi tugash"])
         for d in payload["dryers"]:
-            ws2.append([d["number"], d["batches"], d["avg"], d["median"], d["min"], d["max"],
-                        d["vs_global"], d["defects"], d["defect_rate"], d["status"],
-                        d["last_product"], d["last_finished_at"]])
-        style_head(ws2, 12)
+            ws2.append([d["number"], d["boiler"], d["batches"], d["avg"], d["median"],
+                        d["min"], d["max"], d["vs_global"], d["defects"], d["defect_rate"],
+                        d["status"], d["last_product"], d["last_finished_at"]])
+        style_head(ws2, 13)
+
+        wsb = wb.create_sheet("Qozonlar")
+        wsb.append(["Qozon", "Sushkalar", "Ishlayapti", "Partiyalar", "O'rtacha (min)",
+                    "Mediana", "Min", "Maks", "Jami (min)", "Brak", "Brak %"])
+        for b in payload["boilers"]:
+            wsb.append([f"{b['id']} (№{b['from']}–{b['to']})", b["dryers"], b["in_work"],
+                        b["batches"], b["avg"], b["median"], b["min"], b["max"],
+                        b["total_minutes"], b["defects"], b["defect_rate"]])
+        style_head(wsb, 11)
 
         ws3 = wb.create_sheet("Mahsulotlar")
         ws3.append(["Mahsulot", "Partiyalar", "O'rtacha", "Mediana", "Min", "Maks", "Std", "Brak", "Brak %", "Sushkalar"])

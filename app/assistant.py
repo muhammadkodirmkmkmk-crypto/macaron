@@ -108,6 +108,24 @@ TOOLS = [
         },
     },
     {
+        "name": "boiler_report",
+        "description": (
+            "Отчёт по КОТЛАМ (qozon). Сушки разделены на котлы по номерам: "
+            "котёл 1 — сушки 1–12, котёл 2 — 13–22, котёл 3 — 23–31. "
+            "Возвращает по каждому котлу: сколько партий, среднее/мин/макс время, брак, "
+            "сколько сушек сейчас в работе, и список сушек этого котла. "
+            "Для вопросов «как работает первый котёл», «сравни котлы», «qozon 2 bo'yicha hisobot»."
+        ),
+        "input_schema": {
+            "type": "object",
+            "properties": {
+                "days": {"type": "integer"},
+                "boiler": {"type": "integer", "description": "номер котла 1..3, необязательно"},
+            },
+            "required": ["days"],
+        },
+    },
+    {
         "name": "operators",
         "description": "Кто из операторов сколько отчётов прислал, по скольким сушкам, сколько брака.",
         "input_schema": {
@@ -139,6 +157,7 @@ async def run_tool(name: str, args: dict) -> dict:
 
         if name == "shop_summary":
             k = analytics.kpi(rows, days)
+            running = await analytics.open_loads(s)
             d = [x for x in analytics.dryers(rows) if x["avg"] is not None]
             d.sort(key=lambda x: x["avg"])
             return {
@@ -148,7 +167,36 @@ async def run_tool(name: str, args: dict) -> dict:
                 "fastest": d[0] if d else None,
                 "slowest": d[-1] if d else None,
                 "dryers_with_data": len(d),
+                "boilers": analytics.boilers(analytics.dryers(rows), rows),
+                "running_now": [
+                    {"dryer": n, "product": v["product"], "minutes_so_far": v["minutes"],
+                     "since": v["since"], "boiler": config.boiler_of(n)}
+                    for n, v in sorted(running.items())
+                ],
             }
+
+        if name == "boiler_report":
+            ds = analytics.dryers(rows)
+            running = await analytics.open_loads(s)
+            for x in ds:
+                r = running.get(x["number"])
+                if r:
+                    x["status"] = "in_work"
+                    x["running_minutes"] = r["minutes"]
+                    x["running_product"] = r["product"]
+            bs = analytics.boilers(ds, rows)
+            want = args.get("boiler")
+            if want:
+                bs = [b for b in bs if b["id"] == int(want)]
+                if not bs:
+                    return {"error": "такого котла нет, котлы 1..%d" % len(config.BOILER_RANGES)}
+            return {"days": days, "boilers": [
+                {**b, "dryers_list": [
+                    {"dryer": x["number"], "batches": x["batches"], "avg_minutes": x["avg"],
+                     "status": x["status"], "last_product": x["last_product"],
+                     "running_minutes": x.get("running_minutes")}
+                    for x in ds if b["from"] <= x["number"] <= b["to"]]}
+                for b in bs]}
 
         if name == "ranking":
             d = [x for x in analytics.dryers(rows) if x["avg"] is not None]
@@ -198,7 +246,10 @@ async def run_tool(name: str, args: dict) -> dict:
 
 SYSTEM = """Ты — помощник по сушильному цеху макаронной фабрики «Sana Bogatir» (Узбекистан).
 В цехе {dryers} сушильных аппаратов, пронумерованных от 1 до {dryers}.
-Операторы присылают в Telegram отчёты о выгруженных партиях, всё копится в базе.
+Сушки разделены на КОТЛЫ (по-узбекски «qozon»): {boilers}.
+Операторы присылают в Telegram отчёты: «Start vaqt 23:26 qochqor» — партию заложили,
+«Stop vaqt 08:40 qochqor» — выгрузили. Бот сам считает, сколько сушка работала.
+Всё копится в базе.
 
 ЯЗЫК. Строго отвечай на языке последнего вопроса — он указан ниже в поле «Язык ответа».
 Не переключайся на другой язык, даже если вопрос короткий или в нём есть цифры и
@@ -208,6 +259,7 @@ SYSTEM = """Ты — помощник по сушильному цеху мак�
 СЛОВА. Аппарат называй «сушка» / «sushka» — так говорят в цехе. Не пиши «quritgich»,
 «аппарат №», «контейнер». Не используй технические названия полей из базы
 (needs_review, defect_rate и подобные) — переводи их на человеческий язык.
+Котёл по-узбекски «qozon», по-русски «котёл» — не выдумывай других слов.
 
 ПЕРИОД. Почти все данные зависят от периода. Если человек не указал период
 («дай отчёт по 7-й сушке»), СНАЧАЛА спроси, за какой период: за сегодня, за неделю,
@@ -247,6 +299,7 @@ def _system(lang: str = "русский") -> str:
     return SYSTEM.format(
         lang=lang,
         dryers=config.DRYER_COUNT,
+        boilers=", ".join(f"котёл {i} — сушки {lo}–{hi}" for i, lo, hi in config.BOILER_RANGES),
         norm_min=round(config.NORM_MIN_MINUTES / 60, 1),
         norm_max=round(config.NORM_MAX_MINUTES / 60, 1),
         today=dt.datetime.now(config.TZ).strftime("%d.%m.%Y, %H:%M"),

@@ -429,6 +429,9 @@ dialog::backdrop{background:rgba(0,0,0,.45)}
   </section>
 
   <p class="muted" style="font-size:12px;margin:22px 0 0" id="footer"></p>
+  <p class="no-print" style="margin:14px 0 0">
+    <button class="btn" id="wipeBtn" data-i="wipe_btn">Начать с чистого листа</button>
+  </p>
 </div>
 
 <div id="tip" role="tooltip"></div>
@@ -487,6 +490,10 @@ const I18N = {
     batches:"партий", hours:"ч", minutes:"мин", of:"из", save:"Сохранить", del:"Удалить",
     close:"Закрыть", conf:"Уверенность распознавания", raw:"Исходное сообщение", review:"проверить",
     updated:"Обновлено", period:"Период", tz:"Часовой пояс",
+    wipe_btn:"Начать с чистого листа", wipe_title:"Очистить все данные",
+    wipe_text:"Будут удалены все партии, сырые сообщения, открытые заходы и незакрытые вопросы бота. Сушки, котлы и настройки останутся. Отменить это нельзя — если данные нужны, сначала выгрузите Excel.",
+    wipe_ask:"Для подтверждения введите слово", wipe_go:"Очистить", wipe_cancel:"Отмена",
+    wipe_done:"Готово. Данные удалены:", wipe_fail:"Не получилось очистить:",
   },
   uz:{
     subtitle:"quritish sexi",
@@ -533,6 +540,10 @@ const I18N = {
     batches:"partiya", hours:"s", minutes:"min", of:"/", save:"Saqlash", del:"O'chirish",
     close:"Yopish", conf:"Tanib olish ishonchi", raw:"Asl xabar", review:"tekshirish",
     updated:"Yangilandi", period:"Davr", tz:"Vaqt mintaqasi",
+    wipe_btn:"Toza varaqdan boshlash", wipe_title:"Barcha ma'lumotni tozalash",
+    wipe_text:"Barcha partiyalar, xom xabarlar, ochiq startlar va botning javobsiz savollari o'chiriladi. Sushkalar, qozonlar va sozlamalar qoladi. Buni ortga qaytarib bo'lmaydi — kerak bo'lsa, avval Excelga yuklab oling.",
+    wipe_ask:"Tasdiqlash uchun so'zni yozing", wipe_go:"Tozalash", wipe_cancel:"Bekor qilish",
+    wipe_done:"Tayyor. O'chirildi:", wipe_fail:"Tozalab bo'lmadi:",
   }
 };
 let LANG = localStorage.getItem("lang") || "ru";
@@ -1279,6 +1290,44 @@ function openBatch(id){
   $("#dlg").showModal();
 }
 
+/* ---- очистка данных: только вручную и только с подтверждением словом ---- */
+const WIPE_WORD = "TOZALASH";
+function openWipe(){
+  $("#dlgTitle").textContent = t("wipe_title");
+  $("#dlgBody").innerHTML = `
+    <p style="margin:0 0 12px;line-height:1.5">${esc(t("wipe_text"))}</p>
+    <label style="display:block;font-size:13px;color:var(--ink-2)">
+      ${esc(t("wipe_ask"))} <b>${WIPE_WORD}</b>
+      <input id="wipeWord" autocomplete="off" placeholder="${WIPE_WORD}"
+        style="width:100%;margin-top:6px;padding:10px;border-radius:9px;border:1px solid var(--border);
+               background:var(--plane);color:var(--ink-1);font:inherit;text-transform:uppercase">
+    </label>
+    <p id="wipeMsg" class="muted" style="margin:10px 0 0;font-size:13px"></p>
+    <div style="display:flex;gap:8px;margin-top:14px">
+      <button class="btn" id="wipeGo" disabled style="color:${css("--critical")}">${esc(t("wipe_go"))}</button>
+      <button class="btn" id="wipeNo">${esc(t("wipe_cancel"))}</button>
+    </div>`;
+  const inp = $("#wipeWord"), go = $("#wipeGo");
+  inp.addEventListener("input", ()=>{ go.disabled = inp.value.trim().toUpperCase() !== WIPE_WORD; });
+  $("#wipeNo").onclick = () => $("#dlg").close();
+  go.onclick = async () => {
+    go.disabled = true;
+    try{
+      const r = await fetch(`/api/reset?confirm=${WIPE_WORD}`, {method:"POST"});
+      const j = await r.json();
+      if(!r.ok) throw new Error(j.detail || ("HTTP "+r.status));
+      $("#wipeMsg").textContent = `${t("wipe_done")} ${Object.entries(j.deleted).map(([k,v])=>k+" "+v).join(", ")}`;
+      await load();
+      setTimeout(()=>$("#dlg").close(), 1400);
+    }catch(e){
+      $("#wipeMsg").textContent = `${t("wipe_fail")} ${e.message}`;
+      go.disabled = false;
+    }
+  };
+  $("#dlg").showModal();
+  inp.focus();
+}
+
 /* ------------------------------------------------------------------ wiring */
 $("#period").addEventListener("click", e=>{
   const b = e.target.closest("button[data-days]"); if(!b) return;
@@ -1291,6 +1340,7 @@ $("#dlgX").onclick = () => dlg.close();
 dlg.addEventListener("click", e => { if (e.target === dlg) dlg.close(); });  // тап по фону закрывает
 
 $("#refreshBtn").onclick = load;
+$("#wipeBtn").onclick = openWipe;
 $("#drySort").addEventListener("change", ()=>{ localStorage.setItem("drySort", $("#drySort").value); renderDryers(); });
 $("#drySort").value = localStorage.getItem("drySort") || "num";
 $("#boilerSel").addEventListener("change", ()=>{

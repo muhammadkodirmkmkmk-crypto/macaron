@@ -13,6 +13,7 @@ CASES = [
     ("sushka 27 pero 10 soat chiqdi",              "Pero", 600, "unknown"),
     ("Вермишель 7 часов 40 минут готово",          "Vermishel", 460, "unknown"),
     ("Pautunka 13 soat 05 minutda chiqdi",         "Pautinka", 785, "unknown"),
+    ("Zirak 11 soat 40 minutda chiqdi",            "Zirak", 700, "unknown"),
 ]
 
 NOT_REPORTS = ["XoN", "zor zor 😂", "salom", "https://uzfiltr.uz/"]
@@ -26,6 +27,7 @@ CLOCK_CASES = [
     ("Burama 22:00 kirdi 08:30 chiqdi",         (22, 0), (8, 30), 630, "Burama"),
     ("зашла в 03:20 вышла в 13:50 вермишель",   (3, 20), (13, 50), 630, "Vermishel"),
     ("00.28 kirgan 10.30 chiqdi",               (0, 28), (10, 30), 602, None),
+    ("14:27 yopildi 23:50 ochildi burama",      (14, 27), (23, 50), 563, "Burama"),
 ]
 
 
@@ -42,6 +44,10 @@ def check_clock() -> int:
 
 
 LOAD_CASES = [
+    # «yopildi» = закрыли дверь сушки = начало сушки, так пишут в цехе
+    ("14:27 burama yopildi",            (14, 27)),
+    ("14:40 yopildi zirak",             (14, 40)),
+    ("13:27 zirak yopildi",             (13, 27)),
     ("00:28 kirdi burama",              (0, 28)),
     ("12-sushka 01:05 kirgan pero",     (1, 5)),
     ("burama kirdi",                    (-1, -1)),   # времени нет — считаем от сообщения
@@ -49,6 +55,7 @@ LOAD_CASES = [
     ("00:28 kirgan 10:30 chiqdi burama", None),      # есть выход — это готовая партия
     ("Burama 9 soat 30 minutda chiqdi", None),
     ("10:30 chiqdi",                    None),
+    ("14:27 yopildi 23:50 ochildi",     None),   # есть и открытие — готовая партия
     ("zor zor",                         None),
 ]
 

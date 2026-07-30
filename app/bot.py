@@ -190,7 +190,7 @@ async def _handle_load(msg: Message, bot: Bot, caption: str, has_photo: bool,
     body = (
         f"📥 <b>{head} yuklandi</b>\n"
         f"{('🍝 ' + product + chr(10)) if product else ''}"
-        f"⏱ {started_local:%H:%M} · {config.LOAD_REMINDER_HOURS} soatdan keyin eslataman"
+        f"⏱ {started_local:%H:%M} dan boshlandi · {config.LOAD_REMINDER_HOURS} soatdan keyin eslataman"
     )
     if private:
         await msg.answer(body)
@@ -238,7 +238,7 @@ async def load_reminder_loop(bot: Bot) -> None:
                     text = (
                         f"⏰ <b>{config.LOAD_REMINDER_HOURS} soat bo'ldi</b>\n"
                         f"{head}{(' · ' + ev.product) if ev.product else ''}\n"
-                        f"Kirgan: {st:%d.%m %H:%M} · o'tdi {_fmt_dur(passed)}\n"
+                        f"Boshlandi: {st:%d.%m %H:%M} · o'tdi {_fmt_dur(passed)}\n"
                         f"Holati qanday? Chiqqan bo'lsa, vaqtini yozing."
                     )
                     try:

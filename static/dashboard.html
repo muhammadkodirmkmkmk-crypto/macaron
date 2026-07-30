@@ -434,7 +434,7 @@ const I18N = {
     t_ops:"Операторы", t_ops_cap:"Кто и сколько отчётов присылает.",
     t_all:"Все партии", t_all_cap:"Таблица со всеми распознанными записями. Клик по строке — карточка партии и ручная правка.",
     f_review:"Только требующие проверки",
-    st_running:"в работе", st_overdue:"запаздывает", st_stale:"молчит", st_no_data:"нет данных",
+    st_in_work:"сушится", st_running:"в работе", st_overdue:"запаздывает", st_stale:"молчит", st_no_data:"нет данных",
     th_dryer:"Сушка", th_product:"Продукт", th_dur:"Время", th_fin:"Выгружено", th_t:"t°", th_h:"Влажн.",
     th_q:"Качество", th_op:"Оператор", th_note:"Заметка", th_count:"Партий", th_avg:"Среднее",
     th_delta:"Отклонение", th_def:"Брак", th_last:"Последний",
@@ -475,7 +475,7 @@ const I18N = {
     t_ops:"Operatorlar", t_ops_cap:"Kim qancha hisobot yuboradi.",
     t_all:"Barcha partiyalar", t_all_cap:"Barcha yozuvlar jadvali. Qatorni bosing — partiya kartochkasi va qo'lda tuzatish.",
     f_review:"Faqat tekshirish kerak bo'lganlar",
-    st_running:"ishlayapti", st_overdue:"kechikmoqda", st_stale:"jim", st_no_data:"ma'lumot yo'q",
+    st_in_work:"quriyapti", st_running:"ishlayapti", st_overdue:"kechikmoqda", st_stale:"jim", st_no_data:"ma'lumot yo'q",
     th_dryer:"Sushka", th_product:"Mahsulot", th_dur:"Vaqt", th_fin:"Chiqdi", th_t:"t°", th_h:"Namlik",
     th_q:"Sifat", th_op:"Operator", th_note:"Izoh", th_count:"Partiya", th_avg:"O'rtacha",
     th_delta:"Farq", th_def:"Brak", th_last:"Oxirgi",
@@ -505,8 +505,8 @@ const fmtDate = iso => { if(!iso) return "—"; const d=new Date(iso);
   return d.toLocaleString(LANG==="ru"?"ru-RU":"uz-UZ",{day:"2-digit",month:"2-digit",hour:"2-digit",minute:"2-digit"}); };
 const esc = s => String(s??"").replace(/[&<>"]/g,c=>({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;"}[c]));
 
-const STATUS_COLOR = {running:"--good", overdue:"--warning", stale:"--critical", no_data:"--ink-muted"};
-const STATUS_ICON  = {running:"●", overdue:"◐", stale:"○", no_data:"·"};
+const STATUS_COLOR = {in_work:"--s1", running:"--good", overdue:"--warning", stale:"--critical", no_data:"--ink-muted"};
+const STATUS_ICON  = {in_work:"◍", running:"●", overdue:"◐", stale:"○", no_data:"·"};
 
 /* tooltip */
 const tip = $("#tip");
@@ -905,7 +905,7 @@ function tile(label, value, meta, accent){
 
 function renderDryers(){
   const box = $("#dryers"); box.innerHTML = "";
-  $("#dryLegend").innerHTML = ["running","overdue","stale","no_data"].map(s=>
+  $("#dryLegend").innerHTML = ["in_work","running","overdue","stale","no_data"].map(s=>
     `<span><i style="background:${css(STATUS_COLOR[s])};border-radius:50%"></i>${esc(t("st_"+s))}</span>`).join("");
 
   const mode = $("#drySort").value;
@@ -932,7 +932,9 @@ function renderDryers(){
       <div class="hero-c">${d.last_duration!=null ? esc(t("last_cycle")) + (d.last_product?" · "+esc(d.last_product):"")
                                                   : esc(t("no_reports"))}</div>
       <div class="st" style="margin-top:8px"><span class="dot" style="background:${css(STATUS_COLOR[d.status])}"></span>
-        <span>${STATUS_ICON[d.status]} ${esc(t("st_"+d.status))}${d.batches?` · ${d.batches}`:""}</span></div>
+        <span>${STATUS_ICON[d.status]} ${d.running_minutes!=null
+          ? esc(t("st_in_work")) + " " + fmtH(d.running_minutes)
+          : esc(t("st_"+d.status)) + (d.batches?` · ${d.batches}`:"")}</span></div>
       <div class="row"><span class="muted">${t("th_avg")}</span><b>${d.avg!=null?fmtH(d.avg):"—"}</b></div>
       <div class="row"><span class="muted">t° · ${LANG==="ru"?"вл.":"nam."}</span>
         <b>${d.temperature!=null? d.temperature+"°":"—"}${d.humidity!=null? " · "+d.humidity+"%":""}</b></div>

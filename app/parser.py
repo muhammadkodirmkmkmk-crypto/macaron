@@ -34,12 +34,17 @@ DRYER_IN_TEXT_RE = re.compile(
 
 # --- часы захода и выхода: "00:28 kirgan 10:30 chiqdi burama" ---
 CLOCK_TOKEN_RE = re.compile(r"(?<![\d:.])(\d{1,2})\s*[:.\-]\s*(\d{2})(?![\d:.])")
+# Слова о НАЧАЛЕ сушки. «yopildi» — буквально «закрыли»: закрыли дверь сушки,
+# то есть партию заложили и процесс пошёл. В цехе пишут именно так.
 IN_WORDS_RE = re.compile(
     r"(?:kirgan|kirdi|kirib|kirgizildi|kiritildi|solindi|solingan|qo['’]yildi|boshlandi|"
-    r"зашл\w*|заложен\w*|заложил\w*|поставил\w*|начал\w*|старт\w*|вход\w*)", re.I | re.U)
+    r"yopildi|yopdi|yopdim|yopilgan|yopib|yopti|"
+    r"зашл\w*|заложен\w*|заложил\w*|поставил\w*|начал\w*|старт\w*|вход\w*|закрыл\w*)", re.I | re.U)
+# Слова о КОНЦЕ сушки. «ochildi» — «открыли» дверь, то есть выгрузили.
 OUT_WORDS_RE = re.compile(
     r"(?:chiqdi|chiqti|chiqqan|chiqarildi|olindi|tugadi|"
-    r"вышл\w*|снял\w*|снят\w*|готов\w*|выгруз\w*|конец|финиш)", re.I | re.U)
+    r"ochildi|ochdi|ochilgan|ochib|"
+    r"вышл\w*|снял\w*|снят\w*|готов\w*|выгруз\w*|открыл\w*|конец|финиш)", re.I | re.U)
 
 
 def _clock_pairs(text: str):

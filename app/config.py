@@ -51,7 +51,7 @@ DRYER_COUNT = _int("DRYER_COUNT", 31)
 
 # Известные виды макарон. Парсер сначала ищет их, потом отдаёт текст модели.
 KNOWN_PRODUCTS = _csv("PRODUCTS") or [
-    "Burama", "Pero", "Pautinka", "Spiral", "Rojok", "Rakushka",
+    "Burama", "Pero", "Pautinka", "Spiral", "Rojok", "Rakushka", "Zirak",
     "Zvezda", "Vermishel", "Lapsha", "Bantik", "Nay", "Gulcha",
     "Yulduzcha", "Qalampir", "Cho'p", "Uzun", "Qisqa", "Trubka",
 ]
@@ -59,6 +59,7 @@ KNOWN_PRODUCTS = _csv("PRODUCTS") or [
 # Синонимы и опечатки -> канонический продукт
 PRODUCT_ALIASES = {
     "burama": "Burama", "борама": "Burama", "burma": "Burama",
+    "zirak": "Zirak", "зирак": "Zirak", "zirek": "Zirak", "ziyrak": "Zirak",
     "pero": "Pero", "перо": "Pero", "pyero": "Pero",
     "pautinka": "Pautinka", "паутинка": "Pautinka", "poutinka": "Pautinka",
     "pautunka": "Pautinka", "pavtinka": "Pautinka",

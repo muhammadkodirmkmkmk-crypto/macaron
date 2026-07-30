@@ -10,7 +10,7 @@ from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from . import config
-from .db import Batch
+from .db import Batch, LoadEvent
 
 
 def utcnow() -> dt.datetime:
@@ -337,15 +337,43 @@ def serialize(b: Batch) -> dict:
     }
 
 
+async def open_loads(s: AsyncSession) -> dict[int, dict]:
+    """Сушки, которые сейчас в работе: заложили и о выходе ещё не отчитались."""
+    rows = (await s.execute(
+        select(LoadEvent).where(LoadEvent.closed == False)  # noqa: E712
+        .order_by(LoadEvent.started_at.desc())
+    )).scalars().all()
+    now = utcnow()
+    out: dict[int, dict] = {}
+    for ev in rows:
+        if not ev.dryer_number or ev.dryer_number in out:
+            continue
+        out[ev.dryer_number] = {
+            "since": to_local(ev.started_at).isoformat(),
+            "minutes": round((now - ev.started_at).total_seconds() / 60),
+            "product": ev.product,
+        }
+    return out
+
+
 async def dashboard_payload(s: AsyncSession, days: int = 30) -> dict:
     batches = await load(s, days=days)
+    running = await open_loads(s)
+    ds = dryers(batches)
+    for d in ds:
+        r = running.get(d["number"])
+        if r:
+            d["running_since"] = r["since"]
+            d["running_minutes"] = r["minutes"]
+            d["running_product"] = r["product"] or d["last_product"]
+            d["status"] = "in_work"
     return {
         "generated_at": dt.datetime.now(config.TZ).isoformat(),
         "days": days,
         "timezone": config.TIMEZONE,
         "norm": {"min": config.NORM_MIN_MINUTES, "max": config.NORM_MAX_MINUTES},
         "kpi": kpi(batches, days),
-        "dryers": dryers(batches),
+        "dryers": ds,
         "products": by_product(batches),
         "timeline": timeline(batches, min(days, 60)),
         "hours": hour_histogram(batches),

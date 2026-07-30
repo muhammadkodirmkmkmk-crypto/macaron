@@ -405,6 +405,21 @@ async def pending_stops(s: AsyncSession) -> list[dict]:
     } for x in rows]
 
 
+def cycle_norm(batches: list[Batch], product: str | None, dryer_avg: int | None) -> int:
+    """Сколько «должен» длиться цикл. Своя статистика точнее общей нормы."""
+    if product:
+        durs = [b.duration_minutes for b in batches
+                if b.product == product and b.duration_minutes]
+        if len(durs) >= 3:
+            return round(st.mean(durs))
+    if dryer_avg:
+        return dryer_avg
+    all_dur = [b.duration_minutes for b in batches if b.duration_minutes]
+    if len(all_dur) >= 5:
+        return round(st.mean(all_dur))
+    return config.NORM_CYCLE_MINUTES
+
+
 async def dashboard_payload(s: AsyncSession, days: int = 30) -> dict:
     batches = await load(s, days=days)
     running = await open_loads(s)
@@ -413,15 +428,22 @@ async def dashboard_payload(s: AsyncSession, days: int = 30) -> dict:
     for d in ds:
         r = running.get(d["number"])
         if r:
+            prod = r["product"] or d["last_product"]
+            norm = cycle_norm(batches, prod, d["avg"])
             d["running_since"] = r["since"]
             d["running_minutes"] = r["minutes"]
-            d["running_product"] = r["product"] or d["last_product"]
+            d["running_product"] = prod
+            d["running_norm"] = norm
+            # «прошло 7,5 ч из 10 — значит 75%»; больше 100% не показываем
+            d["running_percent"] = min(100, round(100 * r["minutes"] / norm)) if norm else None
+            d["running_left"] = max(0, norm - r["minutes"])
             d["status"] = "in_work"
     return {
         "generated_at": dt.datetime.now(config.TZ).isoformat(),
         "days": days,
         "timezone": config.TIMEZONE,
-        "norm": {"min": config.NORM_MIN_MINUTES, "max": config.NORM_MAX_MINUTES},
+        "norm": {"min": config.NORM_MIN_MINUTES, "max": config.NORM_MAX_MINUTES,
+                 "cycle": config.NORM_CYCLE_MINUTES},
         "kpi": {**kpi(batches, days), "pending_stops": len(waiting)},
         "dryers": ds,
         "boilers": boilers(ds, batches),

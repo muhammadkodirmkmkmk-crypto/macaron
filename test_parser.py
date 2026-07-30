@@ -106,6 +106,29 @@ def check_startstop() -> int:
     return bad
 
 
+def check_vision() -> int:
+    """С фото берём только номер сушки и показания табло — время работы НЕ берём."""
+    bad = 0
+    out = P._merge(P.parse_text(""), {
+        "dryer_number": 16, "dryer_number_confidence": 0.9,
+        "display_line1": "0959",   # это ОСТАВШЕЕСЯ время программы
+        "display_line2": "45.8", "display_line3": "46",
+        "hours": 9, "minutes": 59,  # даже если модель это прислала — игнорируем
+    })
+    for label, cond in (
+        ("время работы с фото не берём", out.duration_minutes is None),
+        ("номер сушки с фото берём", out.dryer_number == 16),
+        ("температура 45.8", out.temperature == 45.8),
+        ("влажность 46", out.humidity == 46),
+        ("остаток программы в timer_raw", out.timer_raw == "09:59"),
+        ("голое фото — не отчёт", P.is_report_message("", has_photo=True) is False),
+        ("фото с подписью — отчёт", P.is_report_message("Pero 10 soat chiqdi", True) is True),
+    ):
+        bad += not cond
+        print(f"{'✓' if cond else '✗'} {label}")
+    return bad
+
+
 def check_boilers() -> int:
     from app import config
     expect = {1: 1, 12: 1, 13: 2, 22: 2, 23: 3, 31: 3, 32: None, None: None}
@@ -142,6 +165,9 @@ def main() -> int:
 
     print()
     bad += check_startstop()
+
+    print()
+    bad += check_vision()
 
     print()
     bad += check_boilers()

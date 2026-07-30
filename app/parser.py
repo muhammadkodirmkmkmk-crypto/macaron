@@ -340,8 +340,10 @@ def parse_text(text: str) -> Parsed:
 
 def is_report_message(text: str, has_photo: bool) -> bool:
     """Похоже ли сообщение на отчёт о выгрузке партии."""
-    if not text and has_photo:
-        return True  # фото без подписи — попробуем распознать
+    if not text:
+        # Голое фото ничего не говорит о времени работы: на табло только
+        # оставшееся время. Номер сушки с него читаем, отчётом не считаем.
+        return False
     t = text or ""
     if DONE_RE.search(t):
         return True
@@ -361,7 +363,7 @@ VISION_SYSTEM = """Ты — оператор-аналитик на макаро�
 1. Крупную золотистую/накладную цифру на стене над щитком — это НОМЕР СУШКИ
    (от 1 до {max_dryer}). Цифра одна или две, часто с тенью, шрифт декоративный.
 2. Красное светодиодное табло контроллера FUBA МПР-49/МПР-51 с тремя строками:
-   строка 1 = ВРЕМЯ, вид «07.22» или «0722» (часы.минуты);
+   строка 1 = ОСТАВШЕЕСЯ ВРЕМЯ программы, вид «07.22» или «0722» (часы.минуты);
    строка 2 = ТЕМПЕРАТУРА в °C, всегда с десятичной точкой, например «82.4», «59.3»;
    строка 3 = ВЛАЖНОСТЬ в %, целое число, например «08», «33», «18».
    Читай цифры буквально, семисегментным шрифтом; не додумывай пропущенные разряды.
@@ -377,13 +379,13 @@ VISION_SYSTEM = """Ты — оператор-аналитик на макаро�
   "display_line2": "<строка 2 или null>",
   "display_line3": "<строка 3 или null>",
   "product": "<название продукта латиницей с большой буквы, или null>",
-  "hours": <int или null>,
-  "minutes": <int или null>,
   "quality": "ok" | "defect" | "unknown",
   "note": "<короткая заметка оператора или null>",
   "dryer_number_confidence": <0.0..1.0>
 }}
-Если цифру сушки не видно — ставь null, НЕ ВЫДУМЫВАЙ."""
+Если цифру сушки не видно — ставь null, НЕ ВЫДУМЫВАЙ.
+Сколько сушка отработала — по фото НЕ определяй: строка 1 это остаток программы,
+а не отработанное время. Про длительность в ответе ничего не пиши."""
 
 
 def _to_float(s: str | None) -> float | None:
@@ -519,12 +521,9 @@ def _merge(base: Parsed, data: dict) -> Parsed:
     if not out.product and data.get("product"):
         out.product = _match_product(str(data["product"])) or str(data["product"]).strip().title()
 
-    if out.duration_minutes is None:
-        h, mn = data.get("hours"), data.get("minutes")
-        if isinstance(h, int) or isinstance(mn, int):
-            total = (h or 0) * 60 + (mn or 0)
-            if 0 < total <= 60 * 48:
-                out.duration_minutes = total
+    # Время работы берём ТОЛЬКО из сообщений (Start/Stop или «9 soat 30 minutda»).
+    # На табло верхняя строка — ОСТАВШЕЕСЯ время программы, а не отработанное:
+    # если считать её длительностью, партия получается выдуманной.
 
     l1, l2, l3 = data.get("display_line1"), data.get("display_line2"), data.get("display_line3")
     timer, temp, hum = map_display(l1, l2, l3)

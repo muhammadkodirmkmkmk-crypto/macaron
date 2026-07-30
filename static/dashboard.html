@@ -491,6 +491,7 @@ const I18N = {
     t_ops:"Операторы", t_ops_cap:"Кто и сколько отчётов присылает.",
     t_all:"Все партии", t_all_cap:"Таблица со всеми распознанными записями. Клик по строке — карточка партии и ручная правка.",
     f_review:"Только требующие проверки",
+    in_work_now:"сушится сейчас", done_pct:"пути пройдено", norm_w:"норма", left:"осталось",
     st_in_work:"сушится", st_running:"в работе", st_overdue:"запаздывает", st_stale:"молчит", st_no_data:"нет данных",
     th_dryer:"Сушка", th_product:"Продукт", th_dur:"Время", th_fin:"Выгружено", th_t:"t°", th_h:"Влажн.",
     th_q:"Качество", th_op:"Оператор", th_note:"Заметка", th_count:"Партий", th_avg:"Среднее",
@@ -543,6 +544,7 @@ const I18N = {
     t_ops:"Operatorlar", t_ops_cap:"Kim qancha hisobot yuboradi.",
     t_all:"Barcha partiyalar", t_all_cap:"Barcha yozuvlar jadvali. Qatorni bosing — partiya kartochkasi va qo'lda tuzatish.",
     f_review:"Faqat tekshirish kerak bo'lganlar",
+    in_work_now:"hozir quriyapti", done_pct:"bajarildi", norm_w:"me'yor", left:"qoldi",
     st_in_work:"quriyapti", st_running:"ishlayapti", st_overdue:"kechikmoqda", st_stale:"jim", st_no_data:"ma'lumot yo'q",
     th_dryer:"Sushka", th_product:"Mahsulot", th_dur:"Vaqt", th_fin:"Chiqdi", th_t:"t°", th_h:"Namlik",
     th_q:"Sifat", th_op:"Operator", th_note:"Izoh", th_count:"Partiya", th_avg:"O'rtacha",
@@ -1090,8 +1092,11 @@ function renderDryers(){
         <span class="bmeta">${b.avg!=null?esc(t("bl_avg"))+" "+fmtHm(b.avg)+" · ":""}${b.batches} ${esc(nPart(b.batches))} · ${b.in_work}/${b.dryers} ${esc(t("bl_inwork"))}</span>`;
       box.append(h);
     }
-    const pct = d.since_minutes!=null && d.expected_minutes
-      ? Math.min(100, Math.round(100*d.since_minutes/d.expected_minutes)) : 0;
+    // сушка в работе — заполняем по проценту цикла, иначе по времени с отчёта
+    const work = d.status==="in_work" && d.running_percent!=null;
+    const pct = work ? d.running_percent
+      : (d.since_minutes!=null && d.expected_minutes
+         ? Math.min(100, Math.round(100*d.since_minutes/d.expected_minutes)) : 0);
     const n = document.createElement("div");
     n.className = "dry" + (d.status==="no_data" ? " nodata" : "");
     const N = DATA.norm || {};
@@ -1101,16 +1106,23 @@ function renderDryers(){
       : (N.min && d.avg < N.min) ? `<span class="badge fastb">${t("b_fast")}</span>` : "";
     n.innerHTML = `
       <div class="n"><span>№${d.number}${d.boiler?`<i class="bch">${esc(t("boil_name")[0])}${d.boiler}</i>`:""}</span>${badge}</div>
-      <div class="hero-t">${d.last_duration!=null?fmtBig(d.last_duration):"—"}</div>
-      <div class="hero-c">${d.last_duration!=null ? esc(t("last_cycle")) + (d.last_product?" · "+esc(d.last_product):"")
-                                                  : esc(t("no_reports"))}</div>
+      <div class="hero-t">${work ? fmtBig(d.running_minutes)
+                                 : (d.last_duration!=null?fmtBig(d.last_duration):"—")}</div>
+      <div class="hero-c">${work
+          ? esc(t("in_work_now")) + (d.running_product?" · "+esc(d.running_product):"")
+          : (d.last_duration!=null ? esc(t("last_cycle")) + (d.last_product?" · "+esc(d.last_product):"")
+                                   : esc(t("no_reports")))}</div>
       <div class="st" style="margin-top:8px"><span class="dot" style="background:${css(STATUS_COLOR[d.status])}"></span>
-        <span>${STATUS_ICON[d.status]} ${d.running_minutes!=null
-          ? esc(t("st_in_work")) + " " + fmtH(d.running_minutes)
+        <span>${STATUS_ICON[d.status]} ${work
+          ? `<b>${d.running_percent}%</b> ${esc(t("done_pct"))}`
           : esc(t("st_"+d.status)) + (d.batches?` · ${d.batches}`:"")}</span></div>
+      ${work ? `
+      <div class="row"><span class="muted">${t("norm_w")}</span><b>${fmtH(d.running_norm)}</b></div>
+      <div class="row"><span class="muted">${t("left")}</span><b>≈ ${fmtH(d.running_left)}</b></div>`
+      : `
       <div class="row"><span class="muted">${t("th_avg")}</span><b>${d.avg!=null?fmtH(d.avg):"—"}</b></div>
       <div class="row"><span class="muted">t° · ${LANG==="ru"?"вл.":"nam."}</span>
-        <b>${d.temperature!=null? d.temperature+"°":"—"}${d.humidity!=null? " · "+d.humidity+"%":""}</b></div>
+        <b>${d.temperature!=null? d.temperature+"°":"—"}${d.humidity!=null? " · "+d.humidity+"%":""}</b></div>`}
       <div class="bar"><i style="width:${pct}%;background:${css(STATUS_COLOR[d.status])}"></i></div>`;
     onTip(n, e=>showTip(e,
       `<b>${esc(t("th_dryer"))} №${d.number}</b>${d.boiler?` · <span class="tk">${esc(t("boil_name"))} ${d.boiler}</span>`:""}<br>
@@ -1118,7 +1130,10 @@ function renderDryers(){
        <span class="tk">${t("th_avg")}:</span> <b>${d.avg!=null?fmtHm(d.avg):"—"}</b><br>
        <span class="tk">min/max:</span> <b>${d.min!=null?fmtH(d.min):"—"} / ${d.max!=null?fmtH(d.max):"—"}</b><br>
        <span class="tk">${t("th_def")}:</span> <b>${d.defects}${d.defect_rate!=null?" ("+d.defect_rate+"%)":""}</b><br>
-       <span class="tk">${t("th_last")}:</span> <b>${fmtDate(d.last_finished_at)}</b>`));
+       <span class="tk">${t("th_last")}:</span> <b>${fmtDate(d.last_finished_at)}</b>` +
+      (d.running_percent!=null
+        ? `<br><span class="tk">${esc(t("in_work_now"))}:</span> <b>${fmtHm(d.running_minutes)} · ${d.running_percent}%</b>`
+        : "")));
     offTip(n, hideTip);
     n.addEventListener("click", ()=>openDryer(d.number));
     box.append(n);

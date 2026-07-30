@@ -211,6 +211,32 @@ async def main() -> int:
         total = len((await s.execute(Batch.__table__.select())).all())
     bad += check(total == before, "новый заход не создал лишнюю партию")
 
+    # --- процент выполнения, пока сушка в работе ---
+    now = dt.datetime.now(dt.timezone.utc)
+    await feed("9 Start vaqt " + (now - dt.timedelta(hours=7, minutes=30)).astimezone(
+        config.TZ).strftime("%H:%M") + " burama", now)
+    async with session() as s:
+        pay = await analytics.dashboard_payload(s, days=30)
+    d9 = next(x for x in pay["dryers"] if x["number"] == 9)
+    bad += check(d9["status"] == "in_work", f"сушка №9 в работе (статус {d9['status']})")
+    bad += check(d9.get("running_norm") == 600,
+                 f"норма цикла 10 часов (получили {d9.get('running_norm')})")
+    bad += check(d9.get("running_percent") == 75,
+                 f"7,5 ч из 10 = 75% (получили {d9.get('running_percent')}%)")
+    bad += check(149 <= (d9.get("running_left") or 0) <= 151,
+                 f"осталось ~2,5 часа (получили {d9.get('running_left')} мин)")
+
+    # выгрузка закрывает цикл — процента больше нет, есть готовая партия
+    await feed("9 Stop vaqt " + now.astimezone(config.TZ).strftime("%H:%M") + " burama",
+               now + dt.timedelta(minutes=1))
+    async with session() as s:
+        pay = await analytics.dashboard_payload(s, days=30)
+    d9 = next(x for x in pay["dryers"] if x["number"] == 9)
+    bad += check(d9["status"] != "in_work" and d9.get("running_percent") is None,
+                 "после Stop сушка больше не «в работе»")
+    bad += check(d9["last_duration"] in (450, 451),
+                 f"записалось 7,5 часа (получили {d9['last_duration']})")
+
     # котлы в выдаче дашборда
     async with session() as s:
         payload = await analytics.dashboard_payload(s, days=30)

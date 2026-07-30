@@ -109,6 +109,10 @@ PRODUCT_ALIASES = {
 NORM_MIN_MINUTES = _int("NORM_MIN_MINUTES", 6 * 60)
 NORM_MAX_MINUTES = _int("NORM_MAX_MINUTES", 16 * 60)
 
+# Норма одного цикла: от неё считаем «сделано столько-то процентов», пока сушка
+# в работе. Если по продукту уже накопилась статистика, берём её среднее.
+NORM_CYCLE_MINUTES = _int("NORM_CYCLE_MINUTES", 10 * 60)
+
 # Напоминание в группу: заложили партию и через столько часов молчат
 LOAD_REMINDER_HOURS = _int("LOAD_REMINDER_HOURS", 10)
 LOAD_REMINDER_ENABLED = os.getenv("LOAD_REMINDER_ENABLED", "1") != "0"

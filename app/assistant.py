@@ -170,7 +170,10 @@ async def run_tool(name: str, args: dict) -> dict:
                 "boilers": analytics.boilers(analytics.dryers(rows), rows),
                 "running_now": [
                     {"dryer": n, "product": v["product"], "minutes_so_far": v["minutes"],
-                     "since": v["since"], "boiler": config.boiler_of(n)}
+                     "since": v["since"], "boiler": config.boiler_of(n),
+                     "norm_minutes": analytics.cycle_norm(rows, v["product"], None),
+                     "percent_done": min(100, round(
+                         100 * v["minutes"] / analytics.cycle_norm(rows, v["product"], None)))}
                     for n, v in sorted(running.items())
                 ],
             }
@@ -250,6 +253,11 @@ SYSTEM = """Ты — помощник по сушильному цеху мак�
 Операторы присылают в Telegram отчёты: «Start vaqt 23:26 qochqor» — партию заложили,
 «Stop vaqt 08:40 qochqor» — выгрузили. Бот сам считает, сколько сушка работала.
 Всё копится в базе.
+Пока сушка в работе, известно, сколько процентов цикла пройдено: прошедшее время
+делится на норму (по продукту, если статистики хватает, иначе общая норма).
+Время работы считается ТОЛЬКО по сообщениям Start/Stop. На фото видно номер сушки,
+температуру и влажность; верхняя строка табло — оставшееся время программы,
+её нельзя выдавать за отработанное.
 
 ЯЗЫК. Строго отвечай на языке последнего вопроса — он указан ниже в поле «Язык ответа».
 Не переключайся на другой язык, даже если вопрос короткий или в нём есть цифры и

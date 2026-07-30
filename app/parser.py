@@ -9,6 +9,7 @@
 from __future__ import annotations
 
 import base64
+import datetime as dt
 import json
 import logging
 import re
@@ -30,6 +31,79 @@ CLOCK_RE = re.compile(r"\b(\d{1,2})\s*[:.\-]\s*(\d{2})\b")
 DRYER_IN_TEXT_RE = re.compile(
     r"(?:sushka|sushk[ai]|сушк[аи]|№|#|nomer|nomeri|raqam)\s*[-:\s]*(\d{1,2})", re.I | re.U
 )
+
+# --- часы захода и выхода: "00:28 kirgan 10:30 chiqdi burama" ---
+CLOCK_TOKEN_RE = re.compile(r"(?<![\d:.])(\d{1,2})\s*[:.\-]\s*(\d{2})(?![\d:.])")
+IN_WORDS_RE = re.compile(
+    r"(?:kirgan|kirdi|kirib|kirgizildi|kiritildi|solindi|solingan|qo['’]yildi|boshlandi|"
+    r"зашл\w*|заложен\w*|заложил\w*|поставил\w*|начал\w*|старт\w*|вход\w*)", re.I | re.U)
+OUT_WORDS_RE = re.compile(
+    r"(?:chiqdi|chiqti|chiqqan|chiqarildi|olindi|tugadi|"
+    r"вышл\w*|снял\w*|снят\w*|готов\w*|выгруз\w*|конец|финиш)", re.I | re.U)
+
+
+def _clock_pairs(text: str):
+    """Достаёт (час, минута, позиция) для каждой отметки времени в строке."""
+    out = []
+    for m in CLOCK_TOKEN_RE.finditer(text):
+        h, mi = int(m.group(1)), int(m.group(2))
+        if h <= 23 and mi <= 59:
+            out.append((h, mi, m.start()))
+    return out
+
+
+def parse_clock_range(text: str) -> tuple[tuple[int, int], tuple[int, int], int] | None:
+    """'00:28 kirgan 10:30 chiqdi' -> ((0,28), (10,30), 602 минуты).
+
+    Слова «зашла» и «вышла» могут стоять и до времени, и после, поэтому каждую
+    отметку привязываем к ближайшему ключевому слову.
+    """
+    if not text:
+        return None
+    times = _clock_pairs(text)
+    if len(times) < 2:
+        return None
+
+    ins = [m.start() for m in IN_WORDS_RE.finditer(text)]
+    outs = [m.start() for m in OUT_WORDS_RE.finditer(text)]
+
+    def nearest(anchors, used=()):
+        if not anchors:
+            return None
+        best, best_d = None, 10 ** 9
+        for h, mi, pos in times:
+            if (h, mi, pos) in used:
+                continue
+            d = min(abs(pos - a) for a in anchors)
+            if d < best_d:
+                best, best_d = (h, mi, pos), d
+        return best
+
+    start = nearest(ins)
+    end = nearest(outs, used=(start,) if start else ())
+
+    # запасной вариант: два времени и слово «вышла» — значит первое вход, второе выход
+    if (start is None or end is None) and len(times) == 2 and outs:
+        start, end = times[0], times[1]
+    if start is None or end is None or start[:2] == end[:2]:
+        return None
+
+    a = start[0] * 60 + start[1]
+    b = end[0] * 60 + end[1]
+    dur = (b - a) % (24 * 60)          # переход через полночь
+    if not (30 <= dur <= 24 * 60 - 30):  # меньше получаса или почти сутки — не верим
+        return None
+    return (start[0], start[1]), (end[0], end[1]), dur
+
+
+def resolve_times(sent_local: dt.datetime, start_hm, end_hm, duration_min: int):
+    """Часы с табло -> реальные даты. Отчёт присылают вскоре после выгрузки,
+    поэтому выход ищем не в будущем относительно момента сообщения."""
+    finished = sent_local.replace(hour=end_hm[0], minute=end_hm[1], second=0, microsecond=0)
+    if finished > sent_local + dt.timedelta(hours=2):
+        finished -= dt.timedelta(days=1)
+    return finished - dt.timedelta(minutes=duration_min), finished
+
 
 CRACK_WORDS = r"(?:trewena|trewna|tresna|treshina|тре[сшщ]ина|трещин\w*|yoriq|yorilgan|yorildi|siniq|singan|brak|брак|деформац\w*)"
 NEGATION = r"(?:yuq|yo'q|yoq|yo‘q|нет|net|net\b|emas)"
@@ -53,6 +127,8 @@ class Parsed:
     humidity: float | None = None
     timer_raw: str | None = None
     display_raw: str | None = None
+    started_hm: tuple[int, int] | None = None   # час:мин захода, если написали
+    finished_hm: tuple[int, int] | None = None  # час:мин выхода
     quality: str = "unknown"           # ok | defect | unknown
     note: str | None = None
     source: str = "regex"              # regex | vision | mixed | manual
@@ -136,8 +212,14 @@ def parse_text(text: str) -> Parsed:
     clean = text.strip()
 
     p.product = _match_product(clean)
-    p.duration_minutes = _duration_from_text(clean)
     p.quality = _quality_from_text(clean)
+
+    # сначала пробуем «зашла в HH:MM, вышла в HH:MM» — это точнее длительности
+    rng = parse_clock_range(clean)
+    if rng:
+        p.started_hm, p.finished_hm, p.duration_minutes = rng
+    else:
+        p.duration_minutes = _duration_from_text(clean)
 
     d = DRYER_IN_TEXT_RE.search(clean)
     if d:

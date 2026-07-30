@@ -39,6 +39,11 @@ ANTHROPIC_API_KEY = (os.getenv("ANTHROPIC_API_KEY") or "").strip()
 ANTHROPIC_MODEL = os.getenv("ANTHROPIC_MODEL", "claude-haiku-4-5")
 VISION_ENABLED = bool(ANTHROPIC_API_KEY) and os.getenv("VISION_ENABLED", "1") != "0"
 
+# Ассистент в личке: свободные вопросы по цеху. Модель посильнее — тут язык и логика,
+# а не чтение семисегментных цифр.
+ASSISTANT_MODEL = os.getenv("ASSISTANT_MODEL", "claude-sonnet-4-5")
+ASSISTANT_ENABLED = bool(ANTHROPIC_API_KEY) and os.getenv("ASSISTANT_ENABLED", "1") != "0"
+
 # ---------- Производство ----------
 DRYER_COUNT = _int("DRYER_COUNT", 31)
 

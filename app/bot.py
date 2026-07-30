@@ -12,7 +12,7 @@ from aiogram.filters import Command, CommandStart
 from aiogram.types import Message, ReactionTypeEmoji
 from sqlalchemy import func, select
 
-from . import config, parser, reports
+from . import assistant, config, parser, reports
 from .db import Batch, Pending, RawMessage, session
 
 log = logging.getLogger("bot")
@@ -63,7 +63,12 @@ async def cmd_start(msg: Message):
         "<code>Burama 9 soat 30 minutda chiqdi</code>\n\n"
         "Rasmdan sushka raqamini va tablo ko'rsatkichlarini o'zim o'qiyman. "
         "Agar raqam ko'rinmasa — so'rayman, siz faqat raqam yuborasiz.\n\n"
-        "Buyruqlar: /stats /sushka /oxirgi /dash /id"
+        "💬 <b>Shu yerda oddiy savol ham berishingiz mumkin:</b>\n"
+        "<i>«7-sushka bo'yicha hisobot ber»</i>\n"
+        "<i>«кто медленнее всех за неделю»</i>\n"
+        "<i>«brak bo'lganmi oxirgi 3 kunda»</i>\n"
+        "O'zbekcha ham, ruscha ham tushunaman.\n\n"
+        "Buyruqlar: /stats /sushka /oxirgi /dash /reset /id"
     )
 
 
@@ -114,6 +119,12 @@ async def cmd_last(msg: Message):
     await msg.answer("\n".join(lines))
 
 
+@router.message(Command("reset", "yangi"))
+async def cmd_reset(msg: Message):
+    assistant.reset(msg.from_user.id if msg.from_user else 0)
+    await msg.answer("🧹 Suhbatni tozaladim. Yangi savol bering.")
+
+
 @router.message(Command("sushka"))
 async def cmd_sushka(msg: Message):
     parts = (msg.text or "").split()
@@ -123,6 +134,44 @@ async def cmd_sushka(msg: Message):
     async with session() as s:
         text = await reports.dryer_card(s, n)
     await msg.answer(text)
+
+
+
+# ---------------------------------------------------------------- ассистент
+
+async def _ask_assistant(msg: Message, question: str) -> None:
+    """Свободный вопрос в личке: показываем «печатает», отвечаем текстом."""
+    uid = msg.from_user.id if msg.from_user else 0
+    try:
+        await msg.bot.send_chat_action(msg.chat.id, "typing")
+    except Exception:  # noqa: BLE001
+        pass
+    try:
+        text = await assistant.answer(uid, question)
+    except Exception as exc:  # noqa: BLE001
+        log.exception("ассистент упал: %s", exc)
+        return await msg.answer("Hozir javob bera olmadim, birozdan keyin urinib ko'ring.")
+
+    for chunk in _split(text):
+        try:
+            await msg.answer(chunk)
+        except Exception:  # модель могла прислать невалидный HTML
+            await msg.answer(chunk, parse_mode=None)
+
+
+def _split(text: str, limit: int = 3800):
+    """Telegram не принимает больше 4096 символов за раз."""
+    if len(text) <= limit:
+        return [text]
+    out, cur = [], ""
+    for line in text.split("\n"):
+        if len(cur) + len(line) + 1 > limit:
+            out.append(cur)
+            cur = ""
+        cur += line + "\n"
+    if cur.strip():
+        out.append(cur)
+    return out
 
 
 # ---------------------------------------------------------------- ответ-уточнение
@@ -200,6 +249,10 @@ def _card(b: Batch) -> str:
     parts = [
         f"🍝 <b>{b.product or '—'}</b> · {_fmt_dur(b.duration_minutes)}",
     ]
+    if b.started_at and b.finished_at:
+        st = b.started_at.replace(tzinfo=dt.timezone.utc).astimezone(config.TZ)
+        fin = b.finished_at.replace(tzinfo=dt.timezone.utc).astimezone(config.TZ)
+        parts.append(f"⏱ {st:%H:%M} kirdi → {fin:%H:%M} chiqdi")
     if b.dryer_number:
         parts.insert(0, f"🔥 Sushka <b>№{b.dryer_number}</b>")
     if b.temperature is not None or b.humidity is not None:
@@ -230,7 +283,10 @@ async def on_report_message(msg: Message, bot: Bot):
     if not has_photo and not caption:
         return
     if not parser.is_report_message(caption, has_photo):
-        if private:
+        # в личке всё, что не отчёт, — это вопрос к ассистенту
+        if private and caption and config.ASSISTANT_ENABLED:
+            await _ask_assistant(msg, caption)
+        elif private:
             await msg.answer(
                 "Bu xabarni hisobot sifatida tanimadim.\n\n"
                 "Guruhdagidek yozing — rasm + izoh:\n"
@@ -287,6 +343,12 @@ async def on_report_message(msg: Message, bot: Bot):
         return
 
     # защита от двойного учёта: тот же отчёт из группы и из лички
+    dup_anchor = sent_at
+    if parsed.finished_hm and parsed.duration_minutes:
+        _sl = sent_at.replace(tzinfo=dt.timezone.utc).astimezone(config.TZ)
+        dup_anchor = parser.resolve_times(_sl, parsed.started_hm or parsed.finished_hm,
+                                          parsed.finished_hm, parsed.duration_minutes)[1] \
+                     .astimezone(dt.timezone.utc).replace(tzinfo=None)
     if parsed.dryer_number and parsed.duration_minutes:
         async with session() as s:
             dup = (await s.execute(
@@ -294,7 +356,7 @@ async def on_report_message(msg: Message, bot: Bot):
                     Batch.dryer_number == parsed.dryer_number,
                     Batch.product == parsed.product,
                     Batch.duration_minutes == parsed.duration_minutes,
-                    Batch.finished_at >= sent_at - dt.timedelta(minutes=config.DUP_WINDOW_MINUTES),
+                    Batch.finished_at >= dup_anchor - dt.timedelta(minutes=config.DUP_WINDOW_MINUTES),
                 ).order_by(Batch.id.desc()).limit(1)
             )).scalar_one_or_none()
             if dup:
@@ -318,8 +380,16 @@ async def on_report_message(msg: Message, bot: Bot):
                     pass
             return
 
+    # если написали часы захода и выхода — берём их, они точнее момента отправки
+    finished_at = sent_at
     started = None
-    if parsed.duration_minutes:
+    if parsed.started_hm and parsed.finished_hm and parsed.duration_minutes:
+        sent_local = sent_at.replace(tzinfo=dt.timezone.utc).astimezone(config.TZ)
+        st_local, fin_local = parser.resolve_times(
+            sent_local, parsed.started_hm, parsed.finished_hm, parsed.duration_minutes)
+        started = st_local.astimezone(dt.timezone.utc).replace(tzinfo=None)
+        finished_at = fin_local.astimezone(dt.timezone.utc).replace(tzinfo=None)
+    elif parsed.duration_minutes:
         started = sent_at - dt.timedelta(minutes=parsed.duration_minutes)
 
     async with session() as s:
@@ -327,7 +397,7 @@ async def on_report_message(msg: Message, bot: Bot):
             dryer_number=parsed.dryer_number,
             product=parsed.product,
             duration_minutes=parsed.duration_minutes,
-            finished_at=sent_at,
+            finished_at=finished_at,
             started_at=started,
             temperature=parsed.temperature,
             humidity=parsed.humidity,

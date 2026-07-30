@@ -255,6 +255,61 @@ def outliers(batches: list[Batch], limit: int = 15) -> list[dict]:
     } for _, delta, b in scored[:limit]]
 
 
+def by_day(batches: list[Batch]) -> list[dict]:
+    """Разбивка по дням: сколько партий и сколько в среднем сушили."""
+    buckets: dict[str, list[Batch]] = defaultdict(list)
+    for b in batches:
+        buckets[to_local(b.finished_at).date().isoformat()].append(b)
+    out = []
+    for day in sorted(buckets, reverse=True):
+        rows = buckets[day]
+        st_ = _stats([b.duration_minutes for b in rows])
+        graded = [b for b in rows if b.quality in ("ok", "defect")]
+        out.append({
+            "date": day,
+            "batches": len(rows),
+            "avg_minutes": st_["avg"],
+            "min_minutes": st_["min"],
+            "max_minutes": st_["max"],
+            "defects": len([b for b in graded if b.quality == "defect"]),
+            "products": sorted({b.product for b in rows if b.product}),
+        })
+    return out
+
+
+async def dryer_report(s: AsyncSession, number: int, days: int) -> dict:
+    """Полный отчёт по одной сушке: итог, разбивка по дням и список партий."""
+    rows = await load(s, days=days, dryer=number)
+    if not rows:
+        return {"dryer": number, "days": days, "batches": 0,
+                "note": "за этот период по этой сушке отчётов не было"}
+    info = next(x for x in dryers(rows) if x["number"] == number)
+    prod = by_product(rows)
+    return {
+        "dryer": number,
+        "days": days,
+        "batches": info["batches"],
+        "avg_minutes": info["avg"],
+        "median_minutes": info["median"],
+        "min_minutes": info["min"],
+        "max_minutes": info["max"],
+        "defects": info["defects"],
+        "defect_rate_percent": info["defect_rate"],
+        "status": info["status"],
+        "last_finished_at": info["last_finished_at"],
+        "last_product": info["last_product"],
+        "last_duration_minutes": info["last_duration"],
+        "temperature_last": info["temperature"],
+        "humidity_last": info["humidity"],
+        "operators": info["operators"],
+        "by_day": by_day(rows),
+        "by_product": [{"product": x["product"], "batches": x["count"],
+                        "avg_minutes": x["avg"], "min_minutes": x["min"],
+                        "max_minutes": x["max"]} for x in prod],
+        "batches_list": [serialize(b) for b in rows[:60]],
+    }
+
+
 def serialize(b: Batch) -> dict:
     return {
         "id": b.id,

@@ -662,10 +662,15 @@ function frame(host, {h=230, padL=44, padR=14, padT=12, padB=30}={}){
   return {svg, w, h, x0:padL, x1:w-padR, y0:padT, y1:h-padB, iw:w-padL-padR, ih:h-padT-padB};
 }
 function yAxis(f, max, fmt=(v=>v), ticks=4){
+  const seen = new Set();
   for(let i=0;i<=ticks;i++){
     const v = max*i/ticks, y = f.y1 - (f.ih*i/ticks);
     f.svg.append(el("line",{x1:f.x0,x2:f.x1,y1:y,y2:y,class:i?"g-line":"axis-line"}));
-    const tx = el("text",{x:f.x0-7,y:y+4,class:"tick","text-anchor":"end"}); tx.textContent = fmt(v);
+    // при маленьких значениях подписи повторяются («1 1 1 0 0») — рисуем только новые
+    const label = String(fmt(v));
+    if (seen.has(label)) continue;
+    seen.add(label);
+    const tx = el("text",{x:f.x0-7,y:y+4,class:"tick","text-anchor":"end"}); tx.textContent = label;
     f.svg.append(tx);
   }
 }
@@ -945,6 +950,32 @@ function renderHero(){
   const avg = k.avg_duration;
   const dSlow = slow.avg - avg, dFast = avg - fast.avg;
   const ru = LANG === "ru";
+
+  // одна сушка с данными: «быстрее всех» и «медленнее всех» — это она же, звучит глупо
+  if (withAvg.length === 1){
+    const d = withAvg[0];
+    box.innerHTML = `
+      <div>
+        <p class="big">${esc(t("hero_avg"))}</p>
+        <div class="num">${fmtBig(avg)}</div>
+        <div class="under">${esc(t("k_med"))} ${fmtHm(k.median_duration)}</div>
+      </div>
+      <div><p class="say">${ru
+        ? `Пока данные только по одной сушке — <b>№${d.number}</b>, ${fmtHm(d.avg)}
+           за ${d.batches} ${nPart(d.batches)}. Сравнивать аппараты между собой
+           будет можно, когда отчитаются остальные ${k.dryer_count - 1}.`
+        : `Hozircha faqat bitta sushka bo'yicha ma'lumot bor — <b>№${d.number}</b>,
+           ${fmtHm(d.avg)} (${d.batches} partiya). Qolgan ${k.dryer_count - 1} tasi
+           hisobot berganda, ularni solishtirib bo'ladi.`}</p>
+        <div class="pair">
+          <div>${esc(t("th_dryer"))}<b>№${d.number}</b></div>
+          <div>${esc(t("th_count"))}<b>${d.batches}</b></div>
+          ${lo!==hi?`<div>${esc(t("hero_spread"))}<b>${fmtH(lo)} – ${fmtH(hi)}</b></div>`:""}
+          ${N.min?`<div>${esc(t("hero_norm"))}<b>${Math.round(N.min/60)}–${Math.round(N.max/60)} ${t("hours")}</b></div>`:""}
+        </div>
+      </div>`;
+    return;
+  }
 
   const say = ru
     ? `В среднем аппарат заканчивает партию за <b>${fmtHm(avg)}</b>.

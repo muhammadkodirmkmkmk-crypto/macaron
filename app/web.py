@@ -95,7 +95,29 @@ button:active{opacity:.85}
 
     @app.get("/health")
     async def health():
-        return {"ok": True, "time": dt.datetime.now(config.TZ).isoformat()}
+        """Живость + действующие настройки. Секретов здесь нет — только режимы,
+        чтобы можно было проверить, включено ли напоминание, не заходя в Railway."""
+        return {
+            "ok": True,
+            "time": dt.datetime.now(config.TZ).isoformat(),
+            "timezone": config.TIMEZONE,
+            "dryers": config.DRYER_COUNT,
+            "boilers": [f"{lo}-{hi}" for _, lo, hi in config.BOILER_RANGES],
+            "reminder": {
+                "enabled": config.LOAD_REMINDER_ENABLED,
+                "hours": config.LOAD_REMINDER_HOURS,
+            },
+            "daily_report_hour": config.DAILY_REPORT_HOUR,
+            "norm": {
+                "min_minutes": config.NORM_MIN_MINUTES,
+                "max_minutes": config.NORM_MAX_MINUTES,
+                "cycle_minutes": config.NORM_CYCLE_MINUTES,
+            },
+            "stale_hours": config.STALE_HOURS,
+            "vision": {"enabled": config.VISION_ENABLED, "model": config.ANTHROPIC_MODEL},
+            "assistant": {"enabled": config.ASSISTANT_ENABLED, "model": config.ASSISTANT_MODEL},
+            "telegram_bot": bool(config.TELEGRAM_BOT_TOKEN),
+        }
 
     @app.get("/login")
     async def login(p: str = ""):

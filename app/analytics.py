@@ -306,7 +306,14 @@ async def dryer_report(s: AsyncSession, number: int, days: int) -> dict:
         "by_product": [{"product": x["product"], "batches": x["count"],
                         "avg_minutes": x["avg"], "min_minutes": x["min"],
                         "max_minutes": x["max"]} for x in prod],
-        "batches_list": [serialize(b) for b in rows[:60]],
+        # компактный список: длинные поля модели не нужны, а токены стоят денег
+        "batches_list": [{
+            "product": b.product, "minutes": b.duration_minutes,
+            "started_at": to_local(b.started_at).strftime("%d.%m %H:%M") if b.started_at else None,
+            "finished_at": to_local(b.finished_at).strftime("%d.%m %H:%M"),
+            "quality": b.quality, "operator": b.user_name,
+            "temperature": b.temperature, "humidity": b.humidity,
+        } for b in rows[:30]],
     }
 
 

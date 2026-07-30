@@ -13,7 +13,7 @@ from aiogram.types import Message, ReactionTypeEmoji
 from sqlalchemy import func, select
 
 from . import assistant, config, parser, reports
-from .db import Batch, Pending, RawMessage, session
+from .db import Batch, LoadEvent, Pending, RawMessage, session
 
 log = logging.getLogger("bot")
 router = Router()
@@ -135,6 +135,134 @@ async def cmd_sushka(msg: Message):
         text = await reports.dryer_card(s, n)
     await msg.answer(text)
 
+
+
+
+# ---------------------------------------------------------------- загрузка партии
+
+async def _dryer_from_photo(msg: Message, bot: Bot, caption: str) -> tuple[int | None, str | None]:
+    """Номер сушки и продукт: из текста, а если не вышло — с фото."""
+    p = parser.parse_text(caption)
+    if p.dryer_number or not msg.photo or not config.VISION_ENABLED:
+        return p.dryer_number, p.product
+    try:
+        buf = await bot.download(msg.photo[-1].file_id)
+        data = buf.read() if buf else b""
+        if 0 < len(data) <= MAX_PHOTO_BYTES:
+            v = await parser.parse_with_vision(data, caption)
+            return v.dryer_number, v.product or p.product
+    except Exception as exc:  # noqa: BLE001
+        log.warning("не смог прочитать фото загрузки: %s", exc)
+    return p.dryer_number, p.product
+
+
+async def _handle_load(msg: Message, bot: Bot, caption: str, has_photo: bool,
+                       hm, private: bool) -> None:
+    """Записываем факт загрузки и ставим напоминание через N часов."""
+    sent_at = (msg.date or dt.datetime.now(dt.timezone.utc)).astimezone(
+        dt.timezone.utc).replace(tzinfo=None)
+    sent_local = sent_at.replace(tzinfo=dt.timezone.utc).astimezone(config.TZ)
+
+    async with session() as s:
+        dup = (await s.execute(select(LoadEvent.id).where(
+            LoadEvent.chat_id == msg.chat.id, LoadEvent.message_id == msg.message_id
+        ))).scalar_one_or_none()
+        if dup:
+            return
+
+    dryer, product = await _dryer_from_photo(msg, bot, caption)
+    started_local = parser.resolve_single(sent_local, hm)
+    started = started_local.astimezone(dt.timezone.utc).replace(tzinfo=None)
+    remind = started + dt.timedelta(hours=config.LOAD_REMINDER_HOURS)
+
+    async with session() as s:
+        s.add(LoadEvent(
+            chat_id=msg.chat.id, message_id=msg.message_id,
+            dryer_number=dryer, product=product,
+            started_at=started, remind_at=remind,
+            user_name=_uname(msg), raw_text=caption,
+        ))
+        await s.commit()
+
+    log.info("загрузка: сушка %s, %s, напомню %s", dryer, product, remind)
+
+    head = f"Sushka №{dryer}" if dryer else "Sushka"
+    body = (
+        f"📥 <b>{head} yuklandi</b>\n"
+        f"{('🍝 ' + product + chr(10)) if product else ''}"
+        f"⏱ {started_local:%H:%M} · {config.LOAD_REMINDER_HOURS} soatdan keyin eslataman"
+    )
+    if private:
+        await msg.answer(body)
+    else:
+        try:
+            await msg.react([ReactionTypeEmoji(emoji="👌")])
+        except Exception:  # noqa: BLE001
+            pass
+
+
+async def _close_loads(s, chat_id: int | None, dryer: int | None, batch_id: int) -> None:
+    """Пришёл отчёт о выходе — снимаем напоминание по этой сушке."""
+    if not dryer:
+        return
+    rows = (await s.execute(select(LoadEvent).where(
+        LoadEvent.closed == False,  # noqa: E712
+        LoadEvent.dryer_number == dryer,
+    ))).scalars().all()
+    for ev in rows:
+        if chat_id and ev.chat_id != chat_id and ev.chat_id not in config.ALLOWED_CHAT_IDS:
+            continue
+        ev.closed = True
+        ev.closed_batch_id = batch_id
+
+
+async def load_reminder_loop(bot: Bot) -> None:
+    """Раз в минуту смотрим, по каким загрузкам пора напомнить."""
+    if not config.LOAD_REMINDER_ENABLED:
+        return
+    while True:
+        await asyncio.sleep(60)
+        try:
+            now = dt.datetime.now(dt.timezone.utc).replace(tzinfo=None)
+            async with session() as s:
+                due = (await s.execute(select(LoadEvent).where(
+                    LoadEvent.reminded == False,  # noqa: E712
+                    LoadEvent.closed == False,    # noqa: E712
+                    LoadEvent.remind_at <= now,
+                ).limit(20))).scalars().all()
+
+                for ev in due:
+                    passed = round((now - ev.started_at).total_seconds() / 60)
+                    st = ev.started_at.replace(tzinfo=dt.timezone.utc).astimezone(config.TZ)
+                    head = f"🔥 Sushka <b>№{ev.dryer_number}</b>" if ev.dryer_number else "🔥 Shu sushka"
+                    text = (
+                        f"⏰ <b>{config.LOAD_REMINDER_HOURS} soat bo'ldi</b>\n"
+                        f"{head}{(' · ' + ev.product) if ev.product else ''}\n"
+                        f"Kirgan: {st:%d.%m %H:%M} · o'tdi {_fmt_dur(passed)}\n"
+                        f"Holati qanday? Chiqqan bo'lsa, vaqtini yozing."
+                    )
+                    try:
+                        await bot.send_message(ev.chat_id, text,
+                                               reply_to_message_id=ev.message_id)
+                    except Exception as exc:  # исходное сообщение могли удалить
+                        log.warning("напоминание без реплая (%s)", exc)
+                        try:
+                            await bot.send_message(ev.chat_id, text)
+                        except Exception as exc2:  # noqa: BLE001
+                            log.warning("напоминание не ушло: %s", exc2)
+                    ev.reminded = True
+
+                # старые незакрытые убираем, чтобы не копились
+                stale = now - dt.timedelta(hours=48)
+                for ev in (await s.execute(select(LoadEvent).where(
+                    LoadEvent.closed == False,  # noqa: E712
+                    LoadEvent.reminded == True,  # noqa: E712
+                    LoadEvent.remind_at <= stale,
+                ).limit(50))).scalars().all():
+                    ev.closed = True
+                await s.commit()
+        except Exception as exc:  # noqa: BLE001
+            log.exception("цикл напоминаний: %s", exc)
 
 
 # ---------------------------------------------------------------- ассистент
@@ -305,6 +433,11 @@ async def on_report_message(msg: Message, bot: Bot):
     has_photo = bool(msg.photo)
     if not has_photo and not caption:
         return
+    # «00:28 kirdi burama» — партию заложили, выхода ещё нет
+    load_hm = parser.parse_load_only(caption)
+    if load_hm is not None and config.LOAD_REMINDER_ENABLED:
+        return await _handle_load(msg, bot, caption, has_photo, load_hm, private)
+
     if not parser.is_report_message(caption, has_photo):
         # в личке всё, что не отчёт, — это вопрос к ассистенту
         if private and caption and config.ASSISTANT_ENABLED:
@@ -443,6 +576,7 @@ async def on_report_message(msg: Message, bot: Bot):
         if r:
             r.processed = True
             r.batch_id = batch_id
+        await _close_loads(s, msg.chat.id, parsed.dryer_number, batch_id)
         await s.commit()
 
     # 3) если номер сушки не определён — переспросить

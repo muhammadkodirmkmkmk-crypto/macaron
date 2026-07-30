@@ -96,6 +96,42 @@ def parse_clock_range(text: str) -> tuple[tuple[int, int], tuple[int, int], int]
     return (start[0], start[1]), (end[0], end[1]), dur
 
 
+def parse_load_only(text: str) -> tuple[int, int] | None:
+    """«00:28 kirdi burama» — партию только заложили, выхода ещё нет.
+
+    Возвращает час:мин загрузки. Если в сообщении есть слово о выходе
+    («chiqdi»), это готовая партия, а не загрузка — вернём None.
+    Если слово о загрузке есть, а времени нет, вернём (-1, -1):
+    значит, засекать надо от момента сообщения.
+    """
+    if not text:
+        return None
+    if OUT_WORDS_RE.search(text):
+        return None
+    if not IN_WORDS_RE.search(text):
+        return None
+    times = _clock_pairs(text)
+    if len(times) > 1:
+        return None
+    if not times:
+        return (-1, -1)
+    return times[0][0], times[0][1]
+
+
+def is_load_message(text: str) -> bool:
+    return parse_load_only(text or "") is not None
+
+
+def resolve_single(sent_local: dt.datetime, hm) -> dt.datetime:
+    """Один час:мин -> дата. Отчёт пишут после события, поэтому в будущее не уходим."""
+    if not hm or hm == (-1, -1):
+        return sent_local
+    t = sent_local.replace(hour=hm[0], minute=hm[1], second=0, microsecond=0)
+    if t > sent_local + dt.timedelta(hours=2):
+        t -= dt.timedelta(days=1)
+    return t
+
+
 def resolve_times(sent_local: dt.datetime, start_hm, end_hm, duration_min: int):
     """Часы с табло -> реальные даты. Отчёт присылают вскоре после выгрузки,
     поэтому выход ищем не в будущем относительно момента сообщения."""

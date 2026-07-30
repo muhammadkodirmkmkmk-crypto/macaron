@@ -41,6 +41,28 @@ def check_clock() -> int:
     return bad
 
 
+LOAD_CASES = [
+    ("00:28 kirdi burama",              (0, 28)),
+    ("12-sushka 01:05 kirgan pero",     (1, 5)),
+    ("burama kirdi",                    (-1, -1)),   # времени нет — считаем от сообщения
+    ("заложили в 03:20 вермишель",      (3, 20)),
+    ("00:28 kirgan 10:30 chiqdi burama", None),      # есть выход — это готовая партия
+    ("Burama 9 soat 30 minutda chiqdi", None),
+    ("10:30 chiqdi",                    None),
+    ("zor zor",                         None),
+]
+
+
+def check_load() -> int:
+    bad = 0
+    for text, exp in LOAD_CASES:
+        got = P.parse_load_only(text)
+        ok = got == exp
+        bad += not ok
+        print(f"{'✓' if ok else '✗'} загрузка: {text[:38]:40} -> {got}")
+    return bad
+
+
 def main() -> int:
     bad = 0
     for text, prod, mins, qual in CASES:
@@ -59,6 +81,9 @@ def main() -> int:
 
     print()
     bad += check_clock()
+
+    print()
+    bad += check_load()
 
     print(f"\n{'ВСЁ ОК' if not bad else f'ОШИБОК: {bad}'}")
     return 1 if bad else 0

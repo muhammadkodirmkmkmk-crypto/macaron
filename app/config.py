@@ -41,7 +41,7 @@ VISION_ENABLED = bool(ANTHROPIC_API_KEY) and os.getenv("VISION_ENABLED", "1") !=
 
 # Ассистент в личке: свободные вопросы по цеху. Модель посильнее — тут язык и логика,
 # а не чтение семисегментных цифр.
-ASSISTANT_MODEL = os.getenv("ASSISTANT_MODEL", "claude-sonnet-4-5")
+ASSISTANT_MODEL = os.getenv("ASSISTANT_MODEL", "claude-haiku-4-5")
 # если основная модель перегружена — уходим на эту
 ASSISTANT_FALLBACK_MODEL = os.getenv("ASSISTANT_FALLBACK_MODEL", "claude-haiku-4-5")
 ASSISTANT_ENABLED = bool(ANTHROPIC_API_KEY) and os.getenv("ASSISTANT_ENABLED", "1") != "0"
@@ -76,6 +76,10 @@ PRODUCT_ALIASES = {
 # Нормальные диапазоны времени сушки (минуты) для подсветки отклонений.
 NORM_MIN_MINUTES = _int("NORM_MIN_MINUTES", 6 * 60)
 NORM_MAX_MINUTES = _int("NORM_MAX_MINUTES", 16 * 60)
+
+# Напоминание в группу: заложили партию и через столько часов молчат
+LOAD_REMINDER_HOURS = _int("LOAD_REMINDER_HOURS", 10)
+LOAD_REMINDER_ENABLED = os.getenv("LOAD_REMINDER_ENABLED", "1") != "0"
 
 # Через сколько часов без сообщения считаем сушку «молчащей»
 STALE_HOURS = _int("STALE_HOURS", 24)

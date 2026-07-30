@@ -34,6 +34,7 @@ async def run_bot() -> None:
     me = await bot.get_me()
     log.info("бот @%s запущен", me.username)
     asyncio.create_task(bot_mod.daily_report_loop(bot))
+    asyncio.create_task(bot_mod.load_reminder_loop(bot))
     await bot.delete_webhook(drop_pending_updates=False)
     await dp.start_polling(bot, allowed_updates=dp.resolve_used_update_types())
 

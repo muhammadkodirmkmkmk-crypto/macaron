@@ -98,6 +98,29 @@ class Pending(Base):
     created_at: Mapped[dt.datetime] = mapped_column(DateTime, default=utcnow)
 
 
+class LoadEvent(Base):
+    """Партию заложили, но о выходе ещё не отчитались.
+
+    Нужна, чтобы через N часов напомнить в группу: что с этим аппаратом?
+    """
+
+    __tablename__ = "load_events"
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True)
+    chat_id: Mapped[int] = mapped_column(BigInteger, index=True)
+    message_id: Mapped[int] = mapped_column(BigInteger)
+    dryer_number: Mapped[int | None] = mapped_column(Integer, index=True)
+    product: Mapped[str | None] = mapped_column(String(64))
+    started_at: Mapped[dt.datetime] = mapped_column(DateTime, index=True)
+    remind_at: Mapped[dt.datetime] = mapped_column(DateTime, index=True)
+    reminded: Mapped[bool] = mapped_column(Boolean, default=False, index=True)
+    closed: Mapped[bool] = mapped_column(Boolean, default=False, index=True)
+    closed_batch_id: Mapped[int | None] = mapped_column(Integer)
+    user_name: Mapped[str | None] = mapped_column(String(128))
+    raw_text: Mapped[str | None] = mapped_column(Text)
+    created_at: Mapped[dt.datetime] = mapped_column(DateTime, default=utcnow)
+
+
 class DryerMeta(Base):
     """Необязательные подписи сушек (цех, бригада)."""
 

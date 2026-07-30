@@ -174,6 +174,29 @@ button:active{opacity:.85}
             await s.commit()
         return {"ok": True}
 
+    @app.post("/api/reset")
+    async def api_reset(confirm: str = Query("", description="должно быть TOZALASH")):
+        """Стереть все накопленные данные и начать с чистого листа.
+
+        Схема, настройки и логика остаются — удаляются только записи:
+        партии, сырые сообщения, открытые заходы и незакрытые вопросы бота.
+        Требует явного подтверждения, чтобы не сработать по случайному запросу.
+        """
+        if confirm != "TOZALASH":
+            raise HTTPException(400, "нужен параметр confirm=TOZALASH")
+        from sqlalchemy import delete as sql_delete
+
+        from .db import LoadEvent, Pending, RawMessage
+
+        wiped = {}
+        async with session() as s:
+            # порядок важен: сначала таблицы, ссылающиеся на партии
+            for model in (Pending, RawMessage, LoadEvent, Batch):
+                res = await s.execute(sql_delete(model))
+                wiped[model.__tablename__] = res.rowcount or 0
+            await s.commit()
+        return {"ok": True, "deleted": wiped}
+
     @app.post("/api/remap-display")
     async def api_remap():
         """Пересчитать температуру и влажность из сохранённых строк табло.

@@ -121,6 +121,31 @@ class LoadEvent(Base):
     created_at: Mapped[dt.datetime] = mapped_column(DateTime, default=utcnow)
 
 
+class StopEvent(Base):
+    """Пришла выгрузка, а захода к ней не нашлось.
+
+    Ждём, когда пришлют время начала — ответом на вопрос бота или отдельным
+    сообщением «Start vaqt ...». Тогда партия достроится задним числом.
+    """
+
+    __tablename__ = "stop_events"
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True)
+    chat_id: Mapped[int] = mapped_column(BigInteger, index=True)
+    message_id: Mapped[int] = mapped_column(BigInteger)
+    ask_message_id: Mapped[int | None] = mapped_column(BigInteger, index=True)
+    dryer_number: Mapped[int | None] = mapped_column(Integer, index=True)
+    product: Mapped[str | None] = mapped_column(String(64))
+    finished_at: Mapped[dt.datetime] = mapped_column(DateTime, index=True)
+    closed: Mapped[bool] = mapped_column(Boolean, default=False, index=True)
+    closed_batch_id: Mapped[int | None] = mapped_column(Integer)
+    user_id: Mapped[int | None] = mapped_column(BigInteger)
+    user_name: Mapped[str | None] = mapped_column(String(128))
+    raw_text: Mapped[str | None] = mapped_column(Text)
+    photo_file_id: Mapped[str | None] = mapped_column(String(256))
+    created_at: Mapped[dt.datetime] = mapped_column(DateTime, default=utcnow)
+
+
 class DryerMeta(Base):
     """Необязательные подписи сушек (цех, бригада)."""
 

@@ -158,6 +158,14 @@ h2{font-size:14px;font-weight:650;margin:0 0 4px;letter-spacing:.01em}
 .bhead .bnums{font-size:12px;font-weight:600;color:var(--ink-1);background:var(--surface-1);
   border:1px solid var(--border);border-radius:8px;padding:2px 8px;white-space:nowrap}
 .bhead .bmeta{font-size:12.5px;color:var(--ink-2);margin-left:auto;text-align:right}
+.warn{background:color-mix(in srgb,var(--warning) 12%,var(--surface-1));
+  border:1px solid color-mix(in srgb,var(--warning) 40%,var(--border));
+  border-radius:var(--radius);padding:13px 16px;margin:0 0 4px}
+.warn b{font-size:14.5px}
+.warn p{margin:5px 0 0;font-size:13px;color:var(--ink-2);line-height:1.45}
+.wlist{display:flex;flex-wrap:wrap;gap:6px;margin-top:9px}
+.wlist span{font-size:12px;background:var(--surface-1);border:1px solid var(--border);
+  border-radius:8px;padding:2px 8px;white-space:nowrap}
 .boilers{display:grid;grid-template-columns:repeat(auto-fit,minmax(230px,1fr));gap:12px}
 .bcard{background:var(--surface-1);border:1px solid var(--border);border-radius:var(--radius);
   padding:14px 16px;cursor:pointer;transition:transform .08s ease}
@@ -330,6 +338,8 @@ dialog::backdrop{background:rgba(0,0,0,.45)}
     <div class="kpis" id="kpis"></div>
   </section>
 
+  <div id="waiting"></div>
+
   <section>
     <h2 data-i="boil_h">Котлы</h2>
     <p class="hint" data-i="boil_hint">Сушки разделены по котлам. Нажмите на котёл — ниже останутся только его сушки.</p>
@@ -490,6 +500,8 @@ const I18N = {
     batches:"партий", hours:"ч", minutes:"мин", of:"из", save:"Сохранить", del:"Удалить",
     close:"Закрыть", conf:"Уверенность распознавания", raw:"Исходное сообщение", review:"проверить",
     updated:"Обновлено", period:"Период", tz:"Часовой пояс",
+    wait_h:"Ждут время начала",
+    wait_hint:"Пришёл «Stop», а «Start» к нему не нашёлся — время сушки пока не посчитано. Ответьте боту в группе одним временем, например 23:26, и партия достроится.",
     wipe_btn:"Начать с чистого листа", wipe_title:"Очистить все данные",
     wipe_text:"Будут удалены все партии, сырые сообщения, открытые заходы и незакрытые вопросы бота. Сушки, котлы и настройки останутся. Отменить это нельзя — если данные нужны, сначала выгрузите Excel.",
     wipe_ask:"Для подтверждения введите слово", wipe_go:"Очистить", wipe_cancel:"Отмена",
@@ -540,6 +552,8 @@ const I18N = {
     batches:"partiya", hours:"s", minutes:"min", of:"/", save:"Saqlash", del:"O'chirish",
     close:"Yopish", conf:"Tanib olish ishonchi", raw:"Asl xabar", review:"tekshirish",
     updated:"Yangilandi", period:"Davr", tz:"Vaqt mintaqasi",
+    wait_h:"Boshlanish vaqtini kutmoqda",
+    wait_hint:"«Stop» keldi, «Start» topilmadi — quritish vaqti hali hisoblanmagan. Guruhda botga javob qilib faqat vaqtni yuboring, masalan 23:26, partiya o'zi to'ldiriladi.",
     wipe_btn:"Toza varaqdan boshlash", wipe_title:"Barcha ma'lumotni tozalash",
     wipe_text:"Barcha partiyalar, xom xabarlar, ochiq startlar va botning javobsiz savollari o'chiriladi. Sushkalar, qozonlar va sozlamalar qoladi. Buni ortga qaytarib bo'lmaydi — kerak bo'lsa, avval Excelga yuklab oling.",
     wipe_ask:"Tasdiqlash uchun so'zni yozing", wipe_go:"Tozalash", wipe_cancel:"Bekor qilish",
@@ -894,6 +908,15 @@ function render(){
     tile(t("k_active"), `${k.active_dryers}<small> / ${k.dryer_count}</small>`, ""),
     tile(t("k_review"), k.needs_review, k.needs_review ? `⚠︎ ${t("review")}` : "✓", k.needs_review ? "--warning" : null),
   ].join("");
+
+  const wait = DATA.pending_stops || [];
+  $("#waiting").innerHTML = !wait.length ? "" : `
+    <div class="warn">
+      <b>${esc(t("wait_h"))} — ${wait.length}</b>
+      <p>${esc(t("wait_hint"))}</p>
+      <div class="wlist">${wait.map(w=>`<span>${w.dryer?"№"+w.dryer:"?"}${
+        w.product?" · "+esc(w.product):""} · ${fmtDate(w.finished_at)}</span>`).join("")}</div>
+    </div>`;
 
   renderDryers();
   renderCharts();

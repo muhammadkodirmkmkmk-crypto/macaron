@@ -4,6 +4,7 @@ from __future__ import annotations
 import asyncio
 import datetime as dt
 import logging
+import re
 
 from aiogram import Bot, Dispatcher, F, Router
 from aiogram.client.default import DefaultBotProperties
@@ -13,7 +14,7 @@ from aiogram.types import Message, ReactionTypeEmoji
 from sqlalchemy import func, select
 
 from . import assistant, config, parser, reports
-from .db import Batch, LoadEvent, Pending, RawMessage, session
+from .db import Batch, LoadEvent, Pending, RawMessage, StopEvent, session
 
 log = logging.getLogger("bot")
 router = Router()
@@ -188,13 +189,32 @@ async def _handle_load(msg: Message, bot: Bot, caption: str, has_photo: bool,
                 LoadEvent.dryer_number == dryer,
             ))).scalars().all():
                 old.closed = True
-        s.add(LoadEvent(
+        load = LoadEvent(
             chat_id=msg.chat.id, message_id=msg.message_id,
             dryer_number=dryer, product=product,
             started_at=started, remind_at=remind,
             user_name=_uname(msg), raw_text=caption,
-        ))
+        )
+        s.add(load)
+        await s.flush()
+        # выгрузка могла прийти раньше захода — тогда достраиваем партию сразу
+        done = await _close_pending_stop(s, msg.chat.id, dryer, product, started)
+        if done:
+            load.closed = True
+            load.closed_batch_id = done["batch_id"]
         await s.commit()
+
+    if done:
+        text = _pair_text(done["dryer"], done["product"], done["duration"],
+                          done["started"], done["finished"])
+        try:
+            await msg.bot.send_message(msg.chat.id, text,
+                                       reply_to_message_id=done["message_id"])
+        except Exception:  # исходную выгрузку могли удалить
+            await msg.answer(text)
+        log.info("заход достроил выгрузку: сушка %s, %s, %s мин",
+                 done["dryer"], done["product"], done["duration"])
+        return
 
     log.info("загрузка: сушка %s, %s, напомню %s", dryer, product, remind)
 
@@ -234,6 +254,103 @@ def _pick_load(rows: list[LoadEvent], dryer: int | None, product: str | None) ->
     return None
 
 
+def _pair_minutes(started: dt.datetime, finished: dt.datetime):
+    """Минуты между заходом и выходом. Заход вечером, выход утром — плюс сутки.
+    Возвращает (минуты | None, исправленный выход)."""
+    if finished <= started:
+        finished = finished + dt.timedelta(days=1)
+    mins = round((finished - started).total_seconds() / 60)
+    return (mins if 0 < mins <= MAX_PAIR_MINUTES else None), finished
+
+
+async def _save_pair(s, *, chat_id, message_id, user_id, user_name, dryer, product,
+                     started, finished, duration, raw_text, photo_file_id=None,
+                     quality="unknown", note=None) -> int:
+    """Готовая партия из пары Start + Stop."""
+    batch = Batch(
+        dryer_number=dryer, product=product, duration_minutes=duration,
+        started_at=started, finished_at=finished,
+        quality=quality, note=note, raw_text=raw_text,
+        source="pair", confidence=0.9 if dryer else 0.6,
+        needs_review=dryer is None,
+        chat_id=chat_id, message_id=message_id,
+        user_id=user_id, user_name=user_name, photo_file_id=photo_file_id,
+    )
+    s.add(batch)
+    await s.flush()
+    return batch.id
+
+
+def _pair_text(dryer, product, duration, started, finished) -> str:
+    st = started.replace(tzinfo=dt.timezone.utc).astimezone(config.TZ)
+    fin = finished.replace(tzinfo=dt.timezone.utc).astimezone(config.TZ)
+    head = f"Sushka <b>№{dryer}</b>" if dryer else "Sushka"
+    text = (
+        f"✅ <b>{head} ishladi: {_fmt_dur(duration)}</b>\n"
+        f"{('🍝 ' + product + chr(10)) if product else ''}"
+        f"⏱ {st:%H:%M} → {fin:%H:%M}"
+    )
+    if not (config.NORM_MIN_MINUTES <= duration <= config.NORM_MAX_MINUTES):
+        text += (f"\n⚠️ me'yordan chetda "
+                 f"({config.NORM_MIN_MINUTES//60}–{config.NORM_MAX_MINUTES//60} soat)")
+    return text
+
+
+def _ask_start_text(dryer, product) -> str:
+    who = " · ".join(x for x in (f"№{dryer}" if dryer else None, product) if x)
+    return (
+        f"🤔 <b>{who or 'Bu partiya'}</b> — «Start» xabari topilmadi, "
+        "shuning uchun hali hisoblamadim.\n\n"
+        "Javob qilib <b>faqat boshlanish vaqtini</b> yuboring — masalan: "
+        "<code>23:26</code>\n"
+        "Yoki odatdagidek «Start vaqt ...» yozing — o'zim juftlab qo'yaman."
+    )
+
+
+async def _close_pending_stop(s, chat_id: int, dryer: int | None, product: str | None,
+                              started: dt.datetime):
+    """Заход пришёл позже выгрузки — достраиваем партию задним числом.
+
+    Берём только те выгрузки, что случились ПОСЛЕ этого захода: обычная новая
+    загрузка так ни с чем не спутается.
+    """
+    rows = (await s.execute(select(StopEvent).where(
+        StopEvent.closed == False,  # noqa: E712
+        StopEvent.chat_id == chat_id,
+        StopEvent.finished_at > started,
+    ).order_by(StopEvent.finished_at.asc()).limit(50))).scalars().all()
+
+    pick = None
+    if dryer:
+        pick = next((x for x in rows if x.dryer_number == dryer), None)
+    if pick is None and product:
+        pick = next((x for x in rows
+                     if (x.product or "").lower() == product.lower()
+                     and (not dryer or x.dryer_number in (None, dryer))), None)
+    if pick is None:
+        return None
+
+    duration, finished = _pair_minutes(started, pick.finished_at)
+    if duration is None:
+        return None
+
+    dryer = dryer or pick.dryer_number
+    product = product or pick.product
+    batch_id = await _save_pair(
+        s, chat_id=pick.chat_id, message_id=pick.message_id,
+        user_id=pick.user_id, user_name=pick.user_name,
+        dryer=dryer, product=product, started=started, finished=finished,
+        duration=duration, raw_text=pick.raw_text, photo_file_id=pick.photo_file_id,
+    )
+    pick.closed = True
+    pick.closed_batch_id = batch_id
+    if dryer and not pick.dryer_number:
+        pick.dryer_number = dryer
+    return {"batch_id": batch_id, "dryer": dryer, "product": product,
+            "duration": duration, "started": started, "finished": finished,
+            "message_id": pick.message_id}
+
+
 async def _handle_stop(msg: Message, bot: Bot, caption: str, has_photo: bool,
                        hm, private: bool) -> bool:
     """«Stop vaqt 22:46 burama» — ищем заход этой сушки и считаем, сколько она работала.
@@ -262,71 +379,69 @@ async def _handle_stop(msg: Message, bot: Bot, caption: str, has_photo: bool,
         ).order_by(LoadEvent.started_at.desc()).limit(120))).scalars().all()
         rows = [e for e in rows if e.chat_id == msg.chat.id or private or not config.ALLOWED_CHAT_IDS]
         ev = _pick_load(rows, dryer, product)
-        duration = 0
+        duration = None
         if ev is not None:
-            started = ev.started_at
-            if finished <= started:
-                finished += dt.timedelta(days=1)   # заход вечером, выход утром
-                finished_local += dt.timedelta(days=1)
-            duration = round((finished - started).total_seconds() / 60)
+            duration, finished = _pair_minutes(ev.started_at, finished)
 
-        if ev is None or duration <= 0 or duration > MAX_PAIR_MINUTES:
-            # новый формат Start/Stop — молча терять сообщение нельзя, спрашиваем
+        photo_id = msg.photo[-1].file_id if has_photo else None
+        if ev is None or duration is None:
+            # заход не нашёлся: сообщение не теряем, а ждём время начала
             if not parser.START_STOP_RE.search(caption):
                 return False
-            head = f"№{dryer}" if dryer else (product or "")
-            await msg.reply(
-                f"🤔 <b>{head}</b> uchun «Start» xabarini topmadim.\n"
-                "Boshlangan vaqtini yozing: <code>Start vaqt 23:26 "
-                f"{(product or 'burama').lower()}</code>"
+            s.add(RawMessage(
+                chat_id=msg.chat.id, message_id=msg.message_id,
+                user_id=msg.from_user.id if msg.from_user else None,
+                user_name=_uname(msg), text=caption, has_photo=has_photo,
+                photo_file_id=photo_id, sent_at=sent_at,
+                parse_error="выгрузка без захода — ждём время начала",
+            ))
+            pend = StopEvent(
+                chat_id=msg.chat.id, message_id=msg.message_id,
+                dryer_number=dryer, product=product, finished_at=finished,
+                user_id=msg.from_user.id if msg.from_user else None,
+                user_name=_uname(msg), raw_text=caption, photo_file_id=photo_id,
             )
-            return True
+            s.add(pend)
+            await s.flush()
+            pend_id = pend.id
+            await s.commit()
 
-        dryer = dryer or ev.dryer_number
-        product = product or ev.product
-        parsed = parser.parse_text(caption)
+        else:
+            dryer = dryer or ev.dryer_number
+            product = product or ev.product
+            parsed = parser.parse_text(caption)
+            s.add(RawMessage(
+                chat_id=msg.chat.id, message_id=msg.message_id,
+                user_id=msg.from_user.id if msg.from_user else None,
+                user_name=_uname(msg), text=caption, has_photo=has_photo,
+                photo_file_id=photo_id, sent_at=sent_at, processed=True,
+            ))
+            batch_id = await _save_pair(
+                s, chat_id=msg.chat.id, message_id=msg.message_id,
+                user_id=msg.from_user.id if msg.from_user else None,
+                user_name=_uname(msg), dryer=dryer, product=product,
+                started=ev.started_at, finished=finished, duration=duration,
+                raw_text=f"{ev.raw_text or ''} || {caption}".strip(" |"),
+                photo_file_id=photo_id, quality=parsed.quality, note=parsed.note,
+            )
+            started = ev.started_at
+            ev.closed = True
+            ev.closed_batch_id = batch_id
+            if dryer and not ev.dryer_number:
+                ev.dryer_number = dryer
+            await s.commit()
 
-        s.add(RawMessage(
-            chat_id=msg.chat.id, message_id=msg.message_id,
-            user_id=msg.from_user.id if msg.from_user else None,
-            user_name=_uname(msg), text=caption, has_photo=has_photo,
-            photo_file_id=msg.photo[-1].file_id if has_photo else None,
-            sent_at=sent_at, processed=True,
-        ))
-        batch = Batch(
-            dryer_number=dryer, product=product,
-            duration_minutes=duration,
-            started_at=started, finished_at=finished,
-            quality=parsed.quality, note=parsed.note,
-            raw_text=f"{ev.raw_text or ''} || {caption}".strip(" |"),
-            source="pair", confidence=0.9 if dryer else 0.6,
-            needs_review=dryer is None,
-            chat_id=msg.chat.id, message_id=msg.message_id,
-            user_id=msg.from_user.id if msg.from_user else None,
-            user_name=_uname(msg),
-            photo_file_id=msg.photo[-1].file_id if has_photo else None,
-        )
-        s.add(batch)
-        await s.flush()
-        batch_id = batch.id
-        ev.closed = True
-        ev.closed_batch_id = batch_id
-        if dryer and not ev.dryer_number:
-            ev.dryer_number = dryer
-        await s.commit()
+    if duration is None or ev is None:
+        ask = await msg.reply(_ask_start_text(dryer, product))
+        async with session() as s:
+            p = await s.get(StopEvent, pend_id)
+            if p:
+                p.ask_message_id = ask.message_id
+                await s.commit()
+        log.info("выгрузка без захода: сушка %s, %s — жду время начала", dryer, product)
+        return True
 
-    st_local = started.replace(tzinfo=dt.timezone.utc).astimezone(config.TZ)
-    head = f"Sushka <b>№{dryer}</b>" if dryer else "Sushka"
-    text = (
-        f"✅ <b>{head} ishladi: {_fmt_dur(duration)}</b>\n"
-        f"{('🍝 ' + product + chr(10)) if product else ''}"
-        f"⏱ {st_local:%H:%M} → {finished_local:%H:%M}"
-    )
-    abnormal = not (config.NORM_MIN_MINUTES <= duration <= config.NORM_MAX_MINUTES)
-    if abnormal:
-        text += (f"\n⚠️ me'yordan chetda "
-                 f"({config.NORM_MIN_MINUTES//60}–{config.NORM_MAX_MINUTES//60} soat)")
-
+    text = _pair_text(dryer, product, duration, started, finished)
     sent = await (msg.answer(text) if private else msg.reply(text))
     if dryer is None:
         ask = await sent.reply(
@@ -398,6 +513,12 @@ async def load_reminder_loop(bot: Bot) -> None:
                     LoadEvent.remind_at <= stale,
                 ).limit(50))).scalars().all():
                     ev.closed = True
+                # выгрузки, к которым так и не прислали время начала
+                for sv in (await s.execute(select(StopEvent).where(
+                    StopEvent.closed == False,  # noqa: E712
+                    StopEvent.finished_at <= stale,
+                ).limit(50))).scalars().all():
+                    sv.closed = True
                 await s.commit()
         except Exception as exc:  # noqa: BLE001
             log.exception("цикл напоминаний: %s", exc)
@@ -464,6 +585,72 @@ def _split(text: str, limit: int = 3800):
 
 
 # ---------------------------------------------------------------- ответ-уточнение
+
+@router.message(F.reply_to_message, F.text.regexp(r"^\s*\d{1,2}\s*[:.\-]\s*\d{2}\s*$"))
+async def reply_with_time(msg: Message):
+    """Ответ временем на вопрос «когда начали?» — достраиваем партию."""
+    if not _allowed(msg):
+        return
+    m = re.match(r"^\s*(\d{1,2})\s*[:.\-]\s*(\d{2})\s*$", msg.text or "")
+    if not m:
+        return
+    h, mi = int(m.group(1)), int(m.group(2))
+    if h > 23 or mi > 59:
+        return
+    ref = msg.reply_to_message.message_id
+
+    async with session() as s:
+        pend = (await s.execute(select(StopEvent).where(
+            StopEvent.chat_id == msg.chat.id,
+            StopEvent.closed == False,  # noqa: E712
+            (StopEvent.ask_message_id == ref) | (StopEvent.message_id == ref),
+        ).order_by(StopEvent.id.desc()).limit(1))).scalar_one_or_none()
+        if not pend:
+            return
+
+        # время начала — до выгрузки; если получилось позже, значит, накануне
+        fin_local = pend.finished_at.replace(tzinfo=dt.timezone.utc).astimezone(config.TZ)
+        st_local = fin_local.replace(hour=h, minute=mi, second=0, microsecond=0)
+        if st_local >= fin_local:
+            st_local -= dt.timedelta(days=1)
+        started = st_local.astimezone(dt.timezone.utc).replace(tzinfo=None)
+
+        duration, finished = _pair_minutes(started, pend.finished_at)
+        if duration is None:
+            return await msg.reply(
+                "🤔 Bu vaqt to'g'ri kelmadi — chiqish vaqtidan keyin yoki juda uzoq. "
+                "Iltimos, qaytadan yuboring."
+            )
+
+        batch_id = await _save_pair(
+            s, chat_id=pend.chat_id, message_id=pend.message_id,
+            user_id=pend.user_id, user_name=pend.user_name,
+            dryer=pend.dryer_number, product=pend.product,
+            started=started, finished=finished, duration=duration,
+            raw_text=pend.raw_text, photo_file_id=pend.photo_file_id,
+        )
+        pend.closed = True
+        pend.closed_batch_id = batch_id
+        raw = (await s.execute(select(RawMessage).where(
+            RawMessage.chat_id == pend.chat_id, RawMessage.message_id == pend.message_id
+        ))).scalar_one_or_none()
+        if raw:
+            raw.processed = True
+            raw.batch_id = batch_id
+            raw.parse_error = None
+        dryer, product = pend.dryer_number, pend.product
+        await s.commit()
+
+    await msg.reply(_pair_text(dryer, product, duration, started, finished))
+    if dryer is None:
+        ask = await msg.answer(
+            f"🤔 Qaysi sushka? Javob qilib <b>raqam</b> yuboring (1–{config.DRYER_COUNT})."
+        )
+        async with session() as s:
+            s.add(Pending(chat_id=msg.chat.id, ask_message_id=ask.message_id, batch_id=batch_id))
+            await s.commit()
+    log.info("время начала ответом: сушка %s, %s, %s мин", dryer, product, duration)
+
 
 @router.message(F.reply_to_message, F.text.regexp(r"^\s*\d{1,2}\s*$"))
 async def reply_with_number(msg: Message):

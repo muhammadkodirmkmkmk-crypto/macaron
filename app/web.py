@@ -186,12 +186,12 @@ button:active{opacity:.85}
             raise HTTPException(400, "нужен параметр confirm=TOZALASH")
         from sqlalchemy import delete as sql_delete
 
-        from .db import LoadEvent, Pending, RawMessage
+        from .db import LoadEvent, Pending, RawMessage, StopEvent
 
         wiped = {}
         async with session() as s:
             # порядок важен: сначала таблицы, ссылающиеся на партии
-            for model in (Pending, RawMessage, LoadEvent, Batch):
+            for model in (Pending, RawMessage, LoadEvent, StopEvent, Batch):
                 res = await s.execute(sql_delete(model))
                 wiped[model.__tablename__] = res.rowcount or 0
             await s.commit()

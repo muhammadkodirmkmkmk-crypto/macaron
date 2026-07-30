@@ -10,7 +10,7 @@ from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from . import config
-from .db import Batch, LoadEvent
+from .db import Batch, LoadEvent, StopEvent
 
 
 def utcnow() -> dt.datetime:
@@ -389,9 +389,26 @@ async def open_loads(s: AsyncSession) -> dict[int, dict]:
     return out
 
 
+async def pending_stops(s: AsyncSession) -> list[dict]:
+    """Выгрузки, к которым ещё не прислали время начала — партия не посчитана."""
+    rows = (await s.execute(
+        select(StopEvent).where(StopEvent.closed == False)  # noqa: E712
+        .order_by(StopEvent.finished_at.desc()).limit(50)
+    )).scalars().all()
+    return [{
+        "dryer": x.dryer_number,
+        "boiler": config.boiler_of(x.dryer_number),
+        "product": x.product,
+        "finished_at": to_local(x.finished_at).isoformat(),
+        "operator": x.user_name,
+        "raw_text": x.raw_text,
+    } for x in rows]
+
+
 async def dashboard_payload(s: AsyncSession, days: int = 30) -> dict:
     batches = await load(s, days=days)
     running = await open_loads(s)
+    waiting = await pending_stops(s)
     ds = dryers(batches)
     for d in ds:
         r = running.get(d["number"])
@@ -405,9 +422,10 @@ async def dashboard_payload(s: AsyncSession, days: int = 30) -> dict:
         "days": days,
         "timezone": config.TIMEZONE,
         "norm": {"min": config.NORM_MIN_MINUTES, "max": config.NORM_MAX_MINUTES},
-        "kpi": kpi(batches, days),
+        "kpi": {**kpi(batches, days), "pending_stops": len(waiting)},
         "dryers": ds,
         "boilers": boilers(ds, batches),
+        "pending_stops": waiting,
         "products": by_product(batches),
         "timeline": timeline(batches, min(days, 60)),
         "hours": hour_histogram(batches),

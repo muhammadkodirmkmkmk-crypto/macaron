@@ -17,7 +17,7 @@ os.environ["ANTHROPIC_API_KEY"] = ""          # без обращения к м�
 os.environ["TELEGRAM_BOT_TOKEN"] = "0:test"
 
 from app import analytics, bot, config, parser  # noqa: E402
-from app.db import Batch, LoadEvent, init_db, session  # noqa: E402
+from app.db import Batch, LoadEvent, StopEvent, init_db, session  # noqa: E402
 
 SENT: list[str] = []
 
@@ -33,12 +33,18 @@ class FakeChat:
         self.id, self.type = cid, ctype
 
 
+class FakeBot:
+    async def send_message(self, chat_id, text, **kw):
+        SENT.append(text)
+        return None
+
+
 class FakeMsg:
     """Ровно те поля aiogram.Message, которые трогают наши обработчики."""
 
     _next_id = 1000
 
-    def __init__(self, text: str, when: dt.datetime, private=False):
+    def __init__(self, text: str, when: dt.datetime, private=False, reply_to=None):
         FakeMsg._next_id += 1
         self.message_id = FakeMsg._next_id
         self.text, self.caption = text, None
@@ -46,7 +52,8 @@ class FakeMsg:
         self.photo = None
         self.from_user = FakeUser()
         self.chat = FakeChat(ctype="private" if private else "supergroup")
-        self.bot = None
+        self.bot = FakeBot()
+        self.reply_to_message = reply_to
 
     async def answer(self, text, **kw):
         SENT.append(text)
@@ -151,6 +158,58 @@ async def main() -> int:
     bad += check(after == before, "без «Start» партия не создаётся")
     bad += check(handled and any("Start" in x for x in SENT),
                  f"бот попросил прислать Start (ответы: {SENT})")
+
+    # --- сценарий из цеха: сначала Stop, потом присылают время начала ---
+    SENT.clear()
+    stop_msg = FakeMsg("Stop vaqt 00:06 burama", at(22, 19, 10))
+    await bot._handle_stop(stop_msg, None, stop_msg.text, False, (0, 6), False)
+    async with session() as s:
+        pend = (await s.execute(StopEvent.__table__.select().where(
+            StopEvent.message_id == stop_msg.message_id))).all()
+    bad += check(len(pend) == 1 and not pend[0].closed,
+                 f"выгрузка сохранена и ждёт заход (получили {len(pend)})")
+    bad += check(any("masalan" in x for x in SENT),
+                 "время в вопросе помечено как пример («masalan»)")
+    bad += check(pend and pend[0].ask_message_id, "вопрос привязан к висящей выгрузке")
+
+    # оператор отвечает на вопрос бота одним временем
+    ask_id = pend[0].ask_message_id
+    reply = FakeMsg("15:06", at(22, 19, 12),
+                    reply_to=type("R", (), {"message_id": ask_id})())
+    await bot.reply_with_time(reply)
+    async with session() as s:
+        rows = (await s.execute(Batch.__table__.select().where(
+            Batch.raw_text == "Stop vaqt 00:06 burama"))).all()
+    bad += check(len(rows) == 1, "партия достроилась по ответу временем")
+    bad += check(rows and rows[0].duration_minutes == 9 * 60,
+                 f"9 часов (15:06 → 00:06), получили {rows[0].duration_minutes if rows else None}")
+    async with session() as s:
+        left = (await s.execute(StopEvent.__table__.select().where(
+            StopEvent.message_id == stop_msg.message_id))).all()
+    bad += check(left and left[0].closed, "висящая выгрузка закрыта")
+
+    # --- тот же случай, но время присылают обычным «Start vaqt ...» ---
+    stop2 = FakeMsg("Stop vaqt 06:00 zirak", at(23, 1, 5))
+    await bot._handle_stop(stop2, None, stop2.text, False, (6, 0), False)
+    async with session() as s:
+        before = len((await s.execute(Batch.__table__.select())).all())
+    await feed("Start vaqt 20:00 zirak", at(23, 1, 20))
+    async with session() as s:
+        after = (await s.execute(Batch.__table__.select().where(
+            Batch.raw_text == "Stop vaqt 06:00 zirak"))).all()
+        total = len((await s.execute(Batch.__table__.select())).all())
+    bad += check(total == before + 1 and len(after) == 1,
+                 "поздний Start достроил раннюю выгрузку")
+    bad += check(after and after[0].duration_minutes == 10 * 60,
+                 f"10 часов (20:00 → 06:00), получили {after[0].duration_minutes if after else None}")
+
+    # обычный новый заход не должен цепляться к старым выгрузкам
+    async with session() as s:
+        before = len((await s.execute(Batch.__table__.select())).all())
+    await feed("Start vaqt 09:00 pautinka", at(23, 4, 5))
+    async with session() as s:
+        total = len((await s.execute(Batch.__table__.select())).all())
+    bad += check(total == before, "новый заход не создал лишнюю партию")
 
     # котлы в выдаче дашборда
     async with session() as s:

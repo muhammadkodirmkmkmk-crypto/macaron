@@ -54,6 +54,8 @@ class FakeMsg:
         self.chat = FakeChat(ctype="private" if private else "supergroup")
         self.bot = FakeBot()
         self.reply_to_message = reply_to
+        self.forward_origin = None
+        self.forward_date = None
 
     async def answer(self, text, **kw):
         SENT.append(text)
@@ -255,6 +257,17 @@ async def main() -> int:
                  f"«10 soat 30 min» -> 630 мин (получили {rows[0].duration_minutes if rows else None})")
     bad += check(any("oldingi partiya" in x or "Chiqqan vaqti" in x for x in SENT),
                  "в вопросе есть зацепка: время выгрузки и прошлая партия")
+
+    # --- пересланное старое сообщение считается по исходной дате ---
+    fwd = FakeMsg("Start vaqt 22:10 bantik", at(24, 9, 0))       # переслали днём
+    fwd.forward_origin = type("O", (), {"date": at(23, 17, 30)})()  # а написано было вчера
+    await bot._handle_load(fwd, None, fwd.text, False, (22, 10), False)
+    async with session() as s:
+        row = (await s.execute(LoadEvent.__table__.select().where(
+            LoadEvent.message_id == fwd.message_id))).all()
+    st = row[0].started_at.replace(tzinfo=dt.timezone.utc).astimezone(config.TZ)
+    bad += check(st.strftime("%d.%m %H:%M") == "23.07 22:10",
+                 f"пересылка: начало 23.07 22:10 (получили {st:%d.%m %H:%M})")
 
     # --- описка в продукте не должна рвать пару (qochqor / quchqar) ---
     await feed("Start vaqt 02:00 qochqor", at(24, 21, 5))

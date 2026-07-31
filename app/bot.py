@@ -46,6 +46,22 @@ def _uname(msg: Message) -> str:
     return (u.full_name or u.username or str(u.id))[:120]
 
 
+def _sent_at(msg: Message) -> dt.datetime:
+    """Когда сообщение было написано НА САМОМ ДЕЛЕ.
+
+    Историю чата бот читать не может, но пересланное старое сообщение несёт
+    исходную дату — по ней и считаем, иначе вчерашняя партия уедет на сегодня.
+    """
+    when = None
+    origin = getattr(msg, "forward_origin", None)
+    if origin is not None:
+        when = getattr(origin, "date", None)
+    if when is None:
+        when = getattr(msg, "forward_date", None)
+    when = when or msg.date or dt.datetime.now(dt.timezone.utc)
+    return when.astimezone(dt.timezone.utc).replace(tzinfo=None)
+
+
 def _fmt_dur(minutes: int | None) -> str:
     if not minutes:
         return "—"
@@ -165,8 +181,7 @@ async def _dryer_from_photo(msg: Message, bot: Bot, caption: str) -> tuple[int |
 async def _handle_load(msg: Message, bot: Bot, caption: str, has_photo: bool,
                        hm, private: bool) -> None:
     """Записываем факт загрузки и ставим напоминание через N часов."""
-    sent_at = (msg.date or dt.datetime.now(dt.timezone.utc)).astimezone(
-        dt.timezone.utc).replace(tzinfo=None)
+    sent_at = _sent_at(msg)
     sent_local = sent_at.replace(tzinfo=dt.timezone.utc).astimezone(config.TZ)
 
     async with session() as s:
@@ -387,8 +402,7 @@ async def _handle_stop(msg: Message, bot: Bot, caption: str, has_photo: bool,
     Возвращает True, если пара нашлась и партия записана. False — пусть сообщение
     идёт по обычному пути разбора.
     """
-    sent_at = (msg.date or dt.datetime.now(dt.timezone.utc)).astimezone(
-        dt.timezone.utc).replace(tzinfo=None)
+    sent_at = _sent_at(msg)
     sent_local = sent_at.replace(tzinfo=dt.timezone.utc).astimezone(config.TZ)
 
     async with session() as s:
@@ -830,7 +844,7 @@ async def on_report_message(msg: Message, bot: Bot):
             )
         return
 
-    sent_at = (msg.date or dt.datetime.now(dt.timezone.utc)).astimezone(dt.timezone.utc).replace(tzinfo=None)
+    sent_at = _sent_at(msg)
     photo_file_id = msg.photo[-1].file_id if has_photo else None
 
     async with session() as s:
@@ -1036,8 +1050,7 @@ async def on_edited_message(msg: Message, bot: Bot):
         hm = parser.parse_load_only(caption)
         if hm is None:
             return
-        sent_at = (msg.date or dt.datetime.now(dt.timezone.utc)).astimezone(
-            dt.timezone.utc).replace(tzinfo=None)
+        sent_at = _sent_at(msg)
         sent_local = sent_at.replace(tzinfo=dt.timezone.utc).astimezone(config.TZ)
         started_local = parser.resolve_single(sent_local, hm)
         started = started_local.astimezone(dt.timezone.utc).replace(tzinfo=None)

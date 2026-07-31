@@ -237,6 +237,61 @@ async def main() -> int:
     bad += check(d9["last_duration"] in (450, 451),
                  f"записалось 7,5 часа (получили {d9['last_duration']})")
 
+    # --- описка в продукте не должна рвать пару (qochqor / quchqar) ---
+    await feed("Start vaqt 02:00 qochqor", at(24, 21, 5))
+    async with session() as s:
+        before = len((await s.execute(Batch.__table__.select())).all())
+    await feed("Stop vaqt 12:00 quchqar", at(25, 7, 5))
+    async with session() as s:
+        rows = (await s.execute(Batch.__table__.select().where(
+            Batch.raw_text.like("%quchqar%")))).all()
+        total = len((await s.execute(Batch.__table__.select())).all())
+    bad += check(total == before + 1 and rows, "«quchqar» склеился со стартом «qochqor»")
+    bad += check(rows and rows[0].duration_minutes == 600,
+                 f"10 часов (02:00 → 12:00), получили {rows[0].duration_minutes if rows else None}")
+
+    # --- заход без номера + выгрузка с номером: пара всё равно находится ---
+    # (запасной путь срабатывает, только если безномерной заход ровно один —
+    #  иначе бот не гадает, а спрашивает; поэтому остальные закрываем)
+    async with session() as s:
+        for row in (await s.execute(
+            LoadEvent.__table__.select().where(LoadEvent.closed == False)  # noqa: E712
+        )).all():
+            obj = await s.get(LoadEvent, row.id)
+            obj.closed = True
+        await s.commit()
+    ev = bot.LoadEvent(chat_id=-100500, message_id=7777, dryer_number=None, product=None,
+                       started_at=at(25, 3, 0).replace(tzinfo=None),
+                       remind_at=at(25, 13, 0).replace(tzinfo=None), raw_text="Start vaqt 08:00")
+    async with session() as s:
+        s.add(ev); await s.commit()
+    stop = FakeMsg("19 Stop vaqt 16:30", at(25, 11, 35))
+    ok = await bot._handle_stop(stop, None, stop.text, False, (16, 30), False)
+    async with session() as s:
+        rows = (await s.execute(Batch.__table__.select().where(Batch.dryer_number == 19))).all()
+    bad += check(ok and len(rows) == 1, "номер только на выгрузке — пара нашлась")
+    bad += check(rows and rows[0].duration_minutes == 510,
+                 f"8 ч 30 мин (08:00 → 16:30), получили {rows[0].duration_minutes if rows else None}")
+
+    # --- подпись дописали правкой: сообщение не должно потеряться ---
+    edited = FakeMsg("Start vaqt 09:00 pero", at(26, 5, 5))
+    await bot.on_edited_message(edited, None)
+    async with session() as s:
+        opened = (await s.execute(LoadEvent.__table__.select().where(
+            LoadEvent.message_id == edited.message_id))).all()
+    bad += check(len(opened) == 1 and not opened[0].closed,
+                 "правка подписи создала заход")
+    # повторная правка с другим временем — время обновляется, дубля нет
+    edited.text = "Start vaqt 08:30 pero"
+    await bot.on_edited_message(edited, None)
+    async with session() as s:
+        opened = (await s.execute(LoadEvent.__table__.select().where(
+            LoadEvent.message_id == edited.message_id))).all()
+    st = opened[0].started_at.replace(tzinfo=dt.timezone.utc).astimezone(config.TZ)
+    bad += check(len(opened) == 1, "повторная правка не создала второй заход")
+    bad += check(st.strftime("%H:%M") == "08:30",
+                 f"время начала обновилось на 08:30 (получили {st:%H:%M})")
+
     # котлы в выдаче дашборда
     async with session() as s:
         payload = await analytics.dashboard_payload(s, days=30)

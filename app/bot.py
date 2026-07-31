@@ -237,7 +237,11 @@ MAX_PAIR_MINUTES = 30 * 60   # дольше 30 часов — значит, за
 
 
 def _pick_load(rows: list[LoadEvent], dryer: int | None, product: str | None) -> LoadEvent | None:
-    """Какой заход закрывает эта выгрузка. rows — открытые заходы, свежие первыми."""
+    """Какой заход закрывает эта выгрузка. rows — открытые заходы, свежие первыми.
+
+    Номер сушки читается с фото и на заходе может не определиться, а на выгрузке
+    определиться (или наоборот) — поэтому одного совпадения по номеру мало.
+    """
     if dryer:
         same = [e for e in rows if e.dryer_number == dryer]
         if same:
@@ -249,6 +253,12 @@ def _pick_load(rows: list[LoadEvent], dryer: int | None, product: str | None) ->
                 and (not dryer or e.dryer_number in (None, dryer))]
         if same:
             return same[-1]
+    # номер знаем, продукт нет: подходит заход без номера, но только если он один —
+    # иначе непонятно, чей он, и лучше спросить
+    if dryer:
+        blank = [e for e in rows if e.dryer_number is None]
+        if len(blank) == 1:
+            return blank[0]
     if not dryer and not product and len(rows) == 1:
         return rows[0]
     return None
@@ -327,6 +337,12 @@ async def _close_pending_stop(s, chat_id: int, dryer: int | None, product: str |
         pick = next((x for x in rows
                      if (x.product or "").lower() == product.lower()
                      and (not dryer or x.dryer_number in (None, dryer))), None)
+    if pick is None and dryer:
+        blank = [x for x in rows if x.dryer_number is None]
+        if len(blank) == 1:
+            pick = blank[0]
+    if pick is None and not dryer and not product and len(rows) == 1:
+        pick = rows[0]
     if pick is None:
         return None
 
@@ -955,6 +971,70 @@ async def on_report_message(msg: Message, bot: Bot):
         pass
     if abnormal:
         await msg.reply(f"⚠️ Sushka №{parsed.dryer_number}: {warn[2:]}")
+
+
+# ---------------------------------------------------------------- правки сообщений
+
+@router.edited_message(F.chat.type.in_({"group", "supergroup", "private"}))
+async def on_edited_message(msg: Message, bot: Bot):
+    """Подпись к фото часто дописывают уже после отправки.
+
+    Telegram присылает такие сообщения отдельным типом обновления, и раньше бот
+    их просто не видел: заход оставался неучтённым, а сушка — «не в работе».
+    """
+    if not _allowed(msg):
+        return
+    caption = (msg.caption or msg.text or "").strip()
+    if not caption:
+        return
+
+    async with session() as s:
+        ev = (await s.execute(select(LoadEvent).where(
+            LoadEvent.chat_id == msg.chat.id,
+            LoadEvent.message_id == msg.message_id,
+        ))).scalar_one_or_none()
+        seen = (await s.execute(select(RawMessage.id).where(
+            RawMessage.chat_id == msg.chat.id,
+            RawMessage.message_id == msg.message_id,
+        ))).scalar_one_or_none()
+
+    if ev is not None:
+        # заход уже записан — правка может менять время начала или продукт
+        hm = parser.parse_load_only(caption)
+        if hm is None:
+            return
+        sent_at = (msg.date or dt.datetime.now(dt.timezone.utc)).astimezone(
+            dt.timezone.utc).replace(tzinfo=None)
+        sent_local = sent_at.replace(tzinfo=dt.timezone.utc).astimezone(config.TZ)
+        started_local = parser.resolve_single(sent_local, hm)
+        started = started_local.astimezone(dt.timezone.utc).replace(tzinfo=None)
+        product = parser.parse_text(caption).product
+        async with session() as s:
+            row = await s.get(LoadEvent, ev.id)
+            if not row or row.closed:
+                return
+            changed = row.started_at != started or (product and row.product != product)
+            row.started_at = started
+            row.remind_at = started + dt.timedelta(hours=config.LOAD_REMINDER_HOURS)
+            if product:
+                row.product = product
+            row.raw_text = caption
+            if changed:
+                row.reminded = False
+            await s.commit()
+        if changed:
+            log.info("правка захода: сушка %s, начало %s", row.dryer_number, started_local)
+            try:
+                await msg.react([ReactionTypeEmoji(emoji="👌")])
+            except Exception:  # noqa: BLE001
+                pass
+        return
+
+    if seen:
+        return          # партию по этому сообщению уже посчитали, повторно не берём
+
+    # содержимое видим впервые — обрабатываем как обычное сообщение
+    await on_report_message(msg, bot)
 
 
 async def daily_report_loop(bot: Bot):

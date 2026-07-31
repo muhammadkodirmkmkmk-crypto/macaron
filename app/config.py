@@ -91,6 +91,8 @@ PRODUCT_ALIASES = {
     "zirak": "Zirak", "зирак": "Zirak", "zirek": "Zirak", "ziyrak": "Zirak",
     "qochqor": "Qochqor", "kochkor": "Qochqor", "qo'chqor": "Qochqor",
     "qochkor": "Qochqor", "кочкор": "Qochqor", "качкор": "Qochqor",
+    "quchqar": "Qochqor", "quchqor": "Qochqor", "qo'chqar": "Qochqor",
+    "кучкар": "Qochqor", "кучкор": "Qochqor",
     "pero": "Pero", "перо": "Pero", "pyero": "Pero",
     "pautinka": "Pautinka", "паутинка": "Pautinka", "poutinka": "Pautinka",
     "pautunka": "Pautinka", "pavtinka": "Pautinka",

@@ -230,9 +230,32 @@ class Parsed:
         return asdict(self)
 
 
+# Служебные слова формата — за название продукта их принимать нельзя
+NOT_PRODUCT = {
+    "start", "stop", "старт", "стоп", "vaqt", "vaqti", "vakt", "время",
+    "soat", "soatda", "soatga", "minut", "minutda", "daqiqa", "daqiqada",
+    "sushka", "sushkasi", "сушка", "сушки", "камера", "kamera", "apparat",
+    "kirdi", "kirgan", "kirib", "chiqdi", "chiqti", "chiqqan", "tugadi",
+    "yopildi", "yopilgan", "ochildi", "ochilgan", "boshlandi", "solindi",
+    "trewena", "trewna", "tresna", "treshina", "yoriq", "brak", "брак",
+    "bordi", "yaxshi", "zo'r", "salom", "rahmat", "bo'ldi", "boldi",
+}
+WORD_RE = re.compile(r"[A-Za-zА-Яа-яЁёЎўҚқҒғҲҳ'’`]{4,}", re.U)
+
+
+def _levenshtein(a: str, b: str) -> int:
+    prev = list(range(len(b) + 1))
+    for i, ca in enumerate(a, 1):
+        cur = [i]
+        for j, cb in enumerate(b, 1):
+            cur.append(min(prev[j] + 1, cur[j - 1] + 1, prev[j - 1] + (ca != cb)))
+        prev = cur
+    return prev[-1]
+
+
 def _match_product(text: str) -> str | None:
     low = text.lower()
-    # Точное вхождение известного слова (по границам)
+    # 1) Точное вхождение известного слова (по границам)
     best = None
     best_pos = 10**9
     for alias, canon in _ALIASES.items():
@@ -241,14 +264,23 @@ def _match_product(text: str) -> str | None:
             best, best_pos = canon, m.start()
     if best:
         return best
-    # Нечёткое: первое слово из букв длиной >=4, если похоже на известное
-    m = re.match(r"\s*([A-Za-zА-Яа-яЎўҚқҒғҲҳ'’`]{4,})", text)
-    if m:
-        w = m.group(1).lower()
+
+    # 2) Нечёткое — по ЛЮБОМУ слову сообщения, а не только по первому:
+    # в «Stop vaqt 10:07 quchqar» продукт стоит последним, и написан с опиской.
+    best, best_d = None, 99
+    for m in WORD_RE.finditer(low):
+        w = m.group(0)
+        if w in NOT_PRODUCT:
+            continue
         for alias, canon in _ALIASES.items():
-            if _fuzzy_close(w, alias):
-                return canon
-    return None
+            if len(alias) < 4 or abs(len(w) - len(alias)) > 2:
+                continue
+            d = _levenshtein(w, alias)
+            if d <= 2 and d < best_d:
+                best, best_d = canon, d
+                if d == 1:
+                    break
+    return best
 
 
 def _fuzzy_close(a: str, b: str, max_dist: int = 2) -> bool:

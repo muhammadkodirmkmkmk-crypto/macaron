@@ -306,14 +306,27 @@ def _pair_text(dryer, product, duration, started, finished) -> str:
     return text
 
 
-def _ask_start_text(dryer, product) -> str:
+async def _ask_start_text(s, dryer, product, finished: dt.datetime) -> str:
+    """Вопрос о времени начала — с зацепкой, от чего оператору плясать."""
     who = " · ".join(x for x in (f"№{dryer}" if dryer else None, product) if x)
+    hint = ""
+    if dryer:
+        prev = (await s.execute(select(Batch).where(
+            Batch.dryer_number == dryer, Batch.finished_at < finished,
+        ).order_by(Batch.finished_at.desc()).limit(1))).scalar_one_or_none()
+        if prev:
+            pl = prev.finished_at.replace(tzinfo=dt.timezone.utc).astimezone(config.TZ)
+            gap = round((finished - prev.finished_at).total_seconds() / 60)
+            hint = (f"\n\n📌 Shu sushkada oldingi partiya <b>{pl:%d.%m %H:%M}</b> da tugagan — "
+                    f"start o'shandan keyin bo'lgan (oradan {_fmt_dur(gap)} o'tdi).")
+    fin_local = finished.replace(tzinfo=dt.timezone.utc).astimezone(config.TZ)
     return (
         f"🤔 <b>{who or 'Bu partiya'}</b> — «Start» xabari topilmadi, "
-        "shuning uchun hali hisoblamadim.\n\n"
-        "Javob qilib <b>faqat boshlanish vaqtini</b> yuboring — masalan: "
-        "<code>23:26</code>\n"
-        "Yoki odatdagidek «Start vaqt ...» yozing — o'zim juftlab qo'yaman."
+        f"shuning uchun hali hisoblamadim.\nChiqqan vaqti: <b>{fin_local:%H:%M}</b>.{hint}\n\n"
+        "Javob qilib yozing — <b>ikkitasidan biri</b>:\n"
+        "• boshlanish vaqti — masalan <code>23:26</code>\n"
+        "• yoki qancha ishlagani — masalan <code>10 soat 30 min</code>\n\n"
+        "Bilmasangiz — «Start vaqt ...» xabarini qaytadan yuboring, o'zim juftlayman."
     )
 
 
@@ -448,7 +461,9 @@ async def _handle_stop(msg: Message, bot: Bot, caption: str, has_photo: bool,
             await s.commit()
 
     if duration is None or ev is None:
-        ask = await msg.reply(_ask_start_text(dryer, product))
+        async with session() as s:
+            ask_text = await _ask_start_text(s, dryer, product, finished)
+        ask = await msg.reply(ask_text)
         async with session() as s:
             p = await s.get(StopEvent, pend_id)
             if p:
@@ -602,17 +617,31 @@ def _split(text: str, limit: int = 3800):
 
 # ---------------------------------------------------------------- ответ-уточнение
 
-@router.message(F.reply_to_message, F.text.regexp(r"^\s*\d{1,2}\s*[:.\-]\s*\d{2}\s*$"))
+# Ответ на вопрос бота: либо час:мин начала, либо сколько сушка отработала
+ANSWER_RE = (r"^\s*\d{1,2}\s*(?:[:.\-]\s*\d{2}"
+             r"|\s*(?:soat|soa|соат|час(?:ов|а)?|ч)\b[^\n]{0,20})\s*$")
+
+
+@router.message(F.reply_to_message, F.text.regexp(ANSWER_RE))
 async def reply_with_time(msg: Message):
-    """Ответ временем на вопрос «когда начали?» — достраиваем партию."""
+    """Ответ на вопрос «когда начали?»: время начала ИЛИ сколько отработала."""
     if not _allowed(msg):
         return
-    m = re.match(r"^\s*(\d{1,2})\s*[:.\-]\s*(\d{2})\s*$", msg.text or "")
-    if not m:
-        return
-    h, mi = int(m.group(1)), int(m.group(2))
-    if h > 23 or mi > 59:
-        return
+    txt = (msg.text or "").strip()
+    hm = worked = None
+    m = re.match(r"^\s*(\d{1,2})\s*[:.\-]\s*(\d{2})\s*$", txt)
+    if m:
+        h, mi = int(m.group(1)), int(m.group(2))
+        if h > 23 or mi > 59:
+            return
+        hm = (h, mi)
+    else:
+        hh, mm = parser.HOUR_RE.search(txt), parser.MIN_RE.search(txt)
+        if not hh and not mm:
+            return
+        worked = (int(hh.group(1)) if hh else 0) * 60 + (int(mm.group(1)) if mm else 0)
+        if not (0 < worked <= MAX_PAIR_MINUTES):
+            return
     ref = msg.reply_to_message.message_id
 
     async with session() as s:
@@ -624,12 +653,16 @@ async def reply_with_time(msg: Message):
         if not pend:
             return
 
-        # время начала — до выгрузки; если получилось позже, значит, накануне
-        fin_local = pend.finished_at.replace(tzinfo=dt.timezone.utc).astimezone(config.TZ)
-        st_local = fin_local.replace(hour=h, minute=mi, second=0, microsecond=0)
-        if st_local >= fin_local:
-            st_local -= dt.timedelta(days=1)
-        started = st_local.astimezone(dt.timezone.utc).replace(tzinfo=None)
+        if worked is not None:
+            # написали, сколько отработала: отсчитываем назад от выгрузки
+            started = pend.finished_at - dt.timedelta(minutes=worked)
+        else:
+            # время начала — до выгрузки; если получилось позже, значит, накануне
+            fin_local = pend.finished_at.replace(tzinfo=dt.timezone.utc).astimezone(config.TZ)
+            st_local = fin_local.replace(hour=hm[0], minute=hm[1], second=0, microsecond=0)
+            if st_local >= fin_local:
+                st_local -= dt.timedelta(days=1)
+            started = st_local.astimezone(dt.timezone.utc).replace(tzinfo=None)
 
         duration, finished = _pair_minutes(started, pend.finished_at)
         if duration is None:

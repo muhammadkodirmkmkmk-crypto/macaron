@@ -237,6 +237,25 @@ async def main() -> int:
     bad += check(d9["last_duration"] in (450, 451),
                  f"записалось 7,5 часа (получили {d9['last_duration']})")
 
+    # --- ответ «сколько отработала» вместо времени начала ---
+    SENT.clear()
+    st2 = FakeMsg("Stop vaqt 09:00 lapsha", at(23, 6, 5))
+    await bot._handle_stop(st2, None, st2.text, False, (9, 0), False)
+    async with session() as s:
+        pend2 = (await s.execute(StopEvent.__table__.select().where(
+            StopEvent.message_id == st2.message_id))).all()
+    ask2 = pend2[0].ask_message_id
+    r2 = FakeMsg("10 soat 30 min", at(23, 6, 7),
+                 reply_to=type("R", (), {"message_id": ask2})())
+    await bot.reply_with_time(r2)
+    async with session() as s:
+        rows = (await s.execute(Batch.__table__.select().where(
+            Batch.raw_text == "Stop vaqt 09:00 lapsha"))).all()
+    bad += check(rows and rows[0].duration_minutes == 630,
+                 f"«10 soat 30 min» -> 630 мин (получили {rows[0].duration_minutes if rows else None})")
+    bad += check(any("oldingi partiya" in x or "Chiqqan vaqti" in x for x in SENT),
+                 "в вопросе есть зацепка: время выгрузки и прошлая партия")
+
     # --- описка в продукте не должна рвать пару (qochqor / quchqar) ---
     await feed("Start vaqt 02:00 qochqor", at(24, 21, 5))
     async with session() as s:

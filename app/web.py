@@ -9,8 +9,8 @@ from fastapi import Body, FastAPI, HTTPException, Query, Request, Response
 from fastapi.responses import FileResponse, HTMLResponse, JSONResponse, StreamingResponse
 from sqlalchemy import select
 
-from . import analytics, config
-from .db import Batch, session
+from . import analytics, config, faults as faults_mod
+from .db import Batch, Fault, session
 
 STATIC = config.BASE_DIR / "static"
 COOKIE = "makaron_auth"
@@ -155,7 +155,58 @@ button:active{opacity:.85}
     @app.get("/api/dashboard")
     async def api_dashboard(days: int = Query(30, ge=1, le=365)):
         async with session() as s:
-            return await analytics.dashboard_payload(s, days=days)
+            data = await analytics.dashboard_payload(s, days=days)
+            data["faults"] = await faults_mod.payload(s, days=days)
+            return data
+
+    # ---------------- поломки в цехе ----------------
+    @app.get("/api/faults")
+    async def api_faults(days: int = Query(30, ge=1, le=365)):
+        async with session() as s:
+            return await faults_mod.payload(s, days=days)
+
+    @app.post("/api/faults")
+    async def api_fault_add(payload: dict = Body(...)):
+        part = (payload.get("part") or "").strip()
+        text = (payload.get("text") or "").strip()
+        if not part:
+            raise HTTPException(400, "part kerak")
+        async with session() as s:
+            row = await faults_mod.add(s, part=part, text=text,
+                                       who=(payload.get("who") or "Dashboard"), source="web")
+            await s.commit()
+            return faults_mod.serialize(row)
+
+    @app.patch("/api/faults/{fault_id}")
+    async def api_fault_patch(fault_id: int, payload: dict = Body(...)):
+        async with session() as s:
+            row = await s.get(Fault, fault_id)
+            if not row:
+                raise HTTPException(404, "topilmadi")
+            if "status" in payload:
+                st = payload["status"]
+                if st == "fixed" and row.status != "fixed":
+                    row.status = "fixed"
+                    row.fixed_at = faults_mod.utcnow()
+                    row.fixed_by = (payload.get("fixed_by") or "Dashboard")[:128]
+                elif st == "open":
+                    row.status, row.fixed_at, row.fixed_by = "open", None, None
+            if payload.get("cost") is not None:
+                row.cost = max(0, int(payload.get("cost") or 0))
+            if payload.get("text"):
+                row.text = str(payload["text"])[:500]
+            await s.commit()
+            return faults_mod.serialize(row)
+
+    @app.delete("/api/faults/{fault_id}")
+    async def api_fault_delete(fault_id: int):
+        async with session() as s:
+            row = await s.get(Fault, fault_id)
+            if not row:
+                raise HTTPException(404, "topilmadi")
+            await s.delete(row)
+            await s.commit()
+            return {"ok": True}
 
     @app.get("/api/batches")
     async def api_batches(

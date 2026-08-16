@@ -146,6 +146,33 @@ class StopEvent(Base):
     created_at: Mapped[dt.datetime] = mapped_column(DateTime, default=utcnow)
 
 
+class Fault(Base):
+    """Поломка в цехе: пришла из рабочей группы или отмечена в дашборде."""
+
+    __tablename__ = "faults"
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True)
+    part: Mapped[str] = mapped_column(String(40), index=True)      # ключ узла из parts.PARTS
+    text: Mapped[str | None] = mapped_column(Text)                 # что написали своими словами
+    zone: Mapped[str | None] = mapped_column(String(64), index=True)
+
+    reported_at: Mapped[dt.datetime] = mapped_column(DateTime, index=True)
+    fixed_at: Mapped[dt.datetime | None] = mapped_column(DateTime, index=True)
+    status: Mapped[str] = mapped_column(String(10), default="open", index=True)   # open | fixed
+
+    who: Mapped[str | None] = mapped_column(String(128))
+    fixed_by: Mapped[str | None] = mapped_column(String(128))
+    cost: Mapped[int] = mapped_column(BigInteger, default=0)
+
+    chat_id: Mapped[int | None] = mapped_column(BigInteger, index=True)
+    message_id: Mapped[int | None] = mapped_column(BigInteger)
+    source: Mapped[str] = mapped_column(String(16), default="telegram")   # telegram | web
+    created_at: Mapped[dt.datetime] = mapped_column(DateTime, default=utcnow)
+
+
+Index("ix_faults_part_time", Fault.part, Fault.reported_at)
+
+
 class DryerMeta(Base):
     """Необязательные подписи сушек (цех, бригада)."""
 

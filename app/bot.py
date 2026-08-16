@@ -13,8 +13,9 @@ from aiogram.filters import Command, CommandStart
 from aiogram.types import Message, ReactionTypeEmoji
 from sqlalchemy import func, select
 
-from . import assistant, config, parser, reports
-from .db import Batch, LoadEvent, Pending, RawMessage, StopEvent, session
+from . import assistant, config, faults as faults_mod, parser, reports
+from . import parts as uskuna
+from .db import Batch, Fault, LoadEvent, Pending, RawMessage, StopEvent, session
 
 log = logging.getLogger("bot")
 router = Router()
@@ -90,7 +91,10 @@ async def cmd_start(msg: Message):
         "<i>«кто медленнее всех за неделю»</i>\n"
         "<i>«brak bo'lganmi oxirgi 3 kunda»</i>\n"
         "O'zbekcha ham, ruscha ham tushunaman.\n\n"
-        "Buyruqlar: /stats /sushka /oxirgi /dash /reset /id"
+        "🔧 <b>Nosozlik bo'lsa</b> — shunchaki yozing:\n"
+        "<code>Elak setkasi yirtildi</code> · <code>14 shovqin qilyapti</code>\n"
+        "Uskunani o'zim tanib, ro'yxatga qo'shaman. Tuzatilgach: <code>/tuzatildi 12</code>\n\n"
+        "Buyruqlar: /stats /sushka /oxirgi /dash /nosozlik /uskunalar /reset /id"
     )
 
 
@@ -158,6 +162,73 @@ async def cmd_sushka(msg: Message):
     await msg.answer(text)
 
 
+
+
+# ---------------------------------------------------------------- поломки в цехе
+def _fault_line(f: Fault, now: dt.datetime) -> str:
+    h = max(0.0, (now - f.reported_at).total_seconds() / 3600)
+    when = f"{h:.0f} soat" if h < 48 else f"{h/24:.0f} kun"
+    return f"#{f.id} <b>{uskuna.NAMES.get(f.part, f.part)}</b> — {when} · {f.who or '—'}"
+
+
+@router.message(Command("nosozlik", "nosozliklar", "polomka"))
+async def cmd_faults(msg: Message):
+    async with session() as s:
+        rows = await faults_mod.open_rows(s)
+    if not rows:
+        return await msg.answer("✅ Ochiq nosozlik yo'q — hammasi ishlayapti.")
+    now = faults_mod.utcnow()
+    await msg.answer("🔧 <b>Ochiq nosozliklar</b>\n\n" +
+                     "\n".join(_fault_line(f, now) for f in rows[:25]) +
+                     "\n\nTuzatilgan bo'lsa: <code>/tuzatildi 12</code>")
+
+
+@router.message(Command("tuzatildi", "tuzat", "tuzatdim"))
+async def cmd_fault_fix(msg: Message):
+    nums = [w.strip("#№.,") for w in (msg.text or "").split()[1:]]
+    nums = [int(w) for w in nums if w.isdigit()]
+    if not nums:
+        return await msg.answer("Qaysi nosozlik? Masalan: <code>/tuzatildi 12</code>\n"
+                                "Ro'yxat: /nosozlik")
+    done = []
+    async with session() as s:
+        for n in nums:
+            f = await s.get(Fault, n)
+            if not f or f.status == "fixed":
+                continue
+            f.status = "fixed"
+            f.fixed_at = faults_mod.utcnow()
+            f.fixed_by = _uname(msg)
+            h = (f.fixed_at - f.reported_at).total_seconds() / 3600
+            done.append(f"#{f.id} {uskuna.NAMES.get(f.part, f.part)} — {h:.1f} soat")
+        await s.commit()
+    await msg.answer(("✅ Tuzatildi:\n" + "\n".join(done)) if done
+                     else "Bunday ochiq nosozlik topilmadi. Ro'yxat: /nosozlik")
+
+
+@router.message(Command("uskunalar", "royxat", "spisok"))
+async def cmd_parts(msg: Message):
+    await msg.answer("🧰 <b>Uskunalar ro'yxati</b>\nRaqamini yozsangiz ham bo'ladi.\n\n" +
+                     "\n".join(f"{i}. {n}" for i, (_k, n, _z) in enumerate(uskuna.PARTS, 1)))
+
+
+async def _try_fault(msg: Message, text: str) -> bool:
+    """Похоже на поломку — записываем. Обычную болтовню не трогаем."""
+    if text.strip().isdigit():
+        return False          # голая цифра — это номер сушки, а не поломка
+    key = uskuna.match(text)
+    if not key:
+        return False
+    async with session() as s:
+        row = await faults_mod.add(
+            s, part=key, text=text, who=_uname(msg),
+            chat_id=msg.chat.id, message_id=msg.message_id,
+            when=_sent_at(msg), source="telegram")
+        await s.commit()
+        fid = row.id
+    await msg.reply(f"🔧 Yozib oldim: <b>{uskuna.NAMES[key]}</b> (#{fid})\n"
+                    f"Tuzatilgach: <code>/tuzatildi {fid}</code>")
+    return True
 
 
 # ---------------------------------------------------------------- загрузка партии
@@ -832,6 +903,9 @@ async def on_report_message(msg: Message, bot: Bot):
         return
 
     if not parser.is_report_message(caption, has_photo):
+        # не отчёт о сушке — может быть, это поломка: «elak setkasi yirtildi»
+        if caption and not caption.startswith("/") and await _try_fault(msg, caption):
+            return
         # в личке всё, что не отчёт, — это вопрос к ассистенту
         if private and caption and config.ASSISTANT_ENABLED:
             await _ask_assistant(msg, caption)

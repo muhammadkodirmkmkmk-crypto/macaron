@@ -306,6 +306,9 @@ dialog::backdrop{background:rgba(0,0,0,.45)}
   .grid31{grid-template-columns:1fr 1fr;gap:7px}
   .kpis{grid-template-columns:1fr 1fr}
 }
+#viewSeg b{margin-left:6px;font-size:11.5px;font-weight:700;padding:1px 6px;border-radius:20px;
+  background:var(--critical);color:#fff;vertical-align:2px}
+#viewSeg b:empty{display:none}
 @media print{.no-print{display:none}}
 </style>
 </head>
@@ -317,6 +320,10 @@ dialog::backdrop{background:rgba(0,0,0,.45)}
       <span class="name">Sana Bogatir<span class="sub" id="subtitle">сушильный цех</span></span></h1>
     <div class="spacer"></div>
     <div class="controls">
+      <div class="seg" id="viewSeg" role="group" aria-label="Экран">
+        <button data-view="dry" aria-pressed="true" data-i="v_dry">Сушка</button>
+        <button data-view="fix" aria-pressed="false"><span data-i="v_fix">Поломки</span><b id="fixBadge"></b></button>
+      </div>
       <div class="seg" id="period" role="group" aria-label="Период">
         <button data-days="1" aria-pressed="false">24ч</button>
         <button data-days="7" aria-pressed="true">7д</button>
@@ -334,13 +341,13 @@ dialog::backdrop{background:rgba(0,0,0,.45)}
 <div class="wrap">
   <div id="error"></div>
 
-  <section>
+  <section class="v-dry">
     <div class="kpis" id="kpis"></div>
   </section>
 
-  <div id="waiting"></div>
+  <div id="waiting" class="v-dry"></div>
 
-  <section id="secFix">
+  <section id="secFix" class="v-fix">
     <h2 data-i="fx_h">Поломки в цехе</h2>
     <p class="hint" data-i="fx_hint">Ребята пишут о поломке в группу обычными словами — бот узнаёт узел и собирает статистику. Что ломается чаще, где и как долго чинят.</p>
     <div class="kpis" id="fxKpis"></div>
@@ -358,19 +365,19 @@ dialog::backdrop{background:rgba(0,0,0,.45)}
     </div>
   </section>
 
-  <section>
+  <section class="v-dry">
     <h2 data-i="boil_h">Котлы</h2>
     <p class="hint" data-i="boil_hint">Сушки разделены по котлам. Нажмите на котёл — ниже останутся только его сушки.</p>
     <div class="boilers" id="boilers"></div>
   </section>
 
-  <section>
+  <section class="v-dry">
     <h2 data-i="rank_h">Сколько сушит каждый аппарат</h2>
     <p class="hint" data-i="rank_hint">Отсортировано от самых медленных к самым быстрым. Пунктир — среднее по цеху; всё, что правее него, сушит дольше остальных.</p>
     <div class="card wide" style="padding:16px 18px 14px"><div id="rank"></div></div>
   </section>
 
-  <section>
+  <section class="v-dry">
     <h2 data-i="dryers_h">Сушки — текущее состояние</h2>
     <p class="hint" data-i="dryers_hint">Статус оценивается по времени с последнего отчёта относительно среднего цикла этой сушки. Нажмите на карточку — история партий.</p>
     <div class="sortbar no-print">
@@ -388,13 +395,13 @@ dialog::backdrop{background:rgba(0,0,0,.45)}
     <div class="grid31" id="dryers" style="margin-top:10px"></div>
   </section>
 
-  <section>
+  <section class="v-dry">
     <h2 data-i="hero_title">Сколько времени аппарат сушит партию</h2>
     <p class="hint" data-i="hero_hint">Сводка по цеху: кто быстрее, кто медленнее и насколько.</p>
     <div class="hero" id="hero"></div>
   </section>
 
-  <section>
+  <section class="v-dry">
     <div class="cards">
       <div class="card"><h3 data-i="c_prod">Среднее время сушки по продукту</h3>
         <p class="cap" data-i="c_prod_cap">Точка — среднее, линия — разброс от минимума до максимума.</p>
@@ -426,7 +433,7 @@ dialog::backdrop{background:rgba(0,0,0,.45)}
     </div>
   </section>
 
-  <section>
+  <section class="v-dry">
     <div class="cards">
       <div class="card"><h3 data-i="t_out">Сильнее всего выбиваются из нормы</h3>
         <p class="cap" data-i="t_out_cap">Отклонение партии от среднего по своему продукту.</p>
@@ -437,7 +444,7 @@ dialog::backdrop{background:rgba(0,0,0,.45)}
     </div>
   </section>
 
-  <section>
+  <section class="v-dry">
     <h2 data-i="t_all">Все партии</h2>
     <p class="hint" data-i="t_all_cap">Таблица со всеми распознанными записями. Клик по строке — карточка партии и ручная правка.</p>
     <div class="filters no-print">
@@ -521,6 +528,7 @@ const I18N = {
     updated:"Обновлено", period:"Период", tz:"Часовой пояс",
     wait_h:"Ждут время начала",
     wait_hint:"Пришёл «Stop», а «Start» к нему не нашёлся — время сушки пока не посчитано. Ответьте боту в группе одним временем, например 23:26, и партия достроится.",
+    v_dry:"Сушка", v_fix:"Поломки",
     fx_h:"Поломки в цехе",
     fx_hint:"Ребята пишут о поломке в группу обычными словами — бот узнаёт узел и собирает статистику. Что ломается чаще, где и как долго чинят.",
     fx_k_open:"Открытых поломок", fx_k_oldest:"самая старая", fx_k_period:"За период",
@@ -588,6 +596,7 @@ const I18N = {
     updated:"Yangilandi", period:"Davr", tz:"Vaqt mintaqasi",
     wait_h:"Boshlanish vaqtini kutmoqda",
     wait_hint:"«Stop» keldi, «Start» topilmadi — quritish vaqti hali hisoblanmagan. Guruhda botga javob qilib faqat vaqtni yuboring, masalan 23:26, partiya o'zi to'ldiriladi.",
+    v_dry:"Quritish", v_fix:"Nosozlik",
     fx_h:"Sexdagi nosozliklar",
     fx_hint:"Yigitlar guruhga oddiy so'z bilan yozadi — bot uskunani tanib, statistikaga qo'shadi. Nima ko'p buziladi, qayerda va qancha vaqtda tuzatiladi.",
     fx_k_open:"Ochiq nosozlik", fx_k_oldest:"eng eskisi", fx_k_period:"Davr ichida",
@@ -937,6 +946,19 @@ async function load(){
   }
 }
 
+/* ---- два экрана: сушка и поломки ---- */
+let VIEW = localStorage.getItem("view") === "fix" ? "fix" : "dry";
+
+function setView(v){
+  VIEW = v === "fix" ? "fix" : "dry";
+  localStorage.setItem("view", VIEW);
+  document.querySelectorAll(".v-dry").forEach(n => n.style.display = VIEW === "dry" ? "" : "none");
+  document.querySelectorAll(".v-fix").forEach(n => n.style.display = VIEW === "fix" ? "" : "none");
+  document.querySelectorAll("#viewSeg button").forEach(b =>
+    b.setAttribute("aria-pressed", String(b.dataset.view === VIEW)));
+  window.scrollTo({top: 0});
+}
+
 /* ------------------------------------------------------------------ render */
 function render(){
   if(!DATA) return;
@@ -973,6 +995,7 @@ function render(){
 
   renderDryers();
   renderFaults();
+  setView(VIEW);
   renderCharts();
   renderTables();
 
@@ -1313,8 +1336,9 @@ async function faultPatch(id, body){
 
 function renderFaults(){
   const F = DATA.faults;
-  if(!F){ $("#secFix").style.display = "none"; return; }
-  $("#secFix").style.display = "";
+  const badge = $("#fixBadge");
+  if(!F){ document.querySelectorAll(".v-fix").forEach(n=>n.remove()); return; }
+  if(badge) badge.textContent = F.kpi.open ? F.kpi.open : "";
   const k = F.kpi;
   $("#fxKpis").innerHTML = [
     tile(t("fx_k_open"), k.open, k.open ? `${t("fx_k_oldest")}: ${fmtDur(k.oldest_hours)}` : "✓",
@@ -1540,6 +1564,8 @@ $("#dlgX").onclick = () => dlg.close();
 dlg.addEventListener("click", e => { if (e.target === dlg) dlg.close(); });  // тап по фону закрывает
 
 $("#refreshBtn").onclick = load;
+document.querySelectorAll("#viewSeg button").forEach(b =>
+  b.onclick = () => setView(b.dataset.view));
 $("#wipeBtn").onclick = openWipe;
 $("#drySort").addEventListener("change", ()=>{ localStorage.setItem("drySort", $("#drySort").value); renderDryers(); });
 $("#drySort").value = localStorage.getItem("drySort") || "num";

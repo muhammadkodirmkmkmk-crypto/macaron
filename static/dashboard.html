@@ -340,6 +340,24 @@ dialog::backdrop{background:rgba(0,0,0,.45)}
 
   <div id="waiting"></div>
 
+  <section id="secFix">
+    <h2 data-i="fx_h">Поломки в цехе</h2>
+    <p class="hint" data-i="fx_hint">Ребята пишут о поломке в группу обычными словами — бот узнаёт узел и собирает статистику. Что ломается чаще, где и как долго чинят.</p>
+    <div class="kpis" id="fxKpis"></div>
+    <div id="fxOpen"></div>
+    <div class="cards" style="margin-top:14px">
+      <div class="card"><h3 data-i="fx_top">Что ломается чаще всего</h3>
+        <p class="cap" data-i="fx_top_cap">За выбранный период. Красным — узел ломался больше трёх раз.</p>
+        <div id="fxTop"></div></div>
+      <div class="card"><h3 data-i="fx_zone">По участкам</h3>
+        <p class="cap" data-i="fx_zone_cap">Где сосредоточены простои.</p>
+        <div id="fxZones"></div></div>
+      <div class="card wide"><h3 data-i="fx_hist">История ремонтов</h3>
+        <p class="cap" data-i="fx_hist_cap">Кто починил и за сколько часов.</p>
+        <div id="fxHist"></div></div>
+    </div>
+  </section>
+
   <section>
     <h2 data-i="boil_h">Котлы</h2>
     <p class="hint" data-i="boil_hint">Сушки разделены по котлам. Нажмите на котёл — ниже останутся только его сушки.</p>
@@ -503,6 +521,20 @@ const I18N = {
     updated:"Обновлено", period:"Период", tz:"Часовой пояс",
     wait_h:"Ждут время начала",
     wait_hint:"Пришёл «Stop», а «Start» к нему не нашёлся — время сушки пока не посчитано. Ответьте боту в группе одним временем, например 23:26, и партия достроится.",
+    fx_h:"Поломки в цехе",
+    fx_hint:"Ребята пишут о поломке в группу обычными словами — бот узнаёт узел и собирает статистику. Что ломается чаще, где и как долго чинят.",
+    fx_k_open:"Открытых поломок", fx_k_oldest:"самая старая", fx_k_period:"За период",
+    fx_k_fixed:"починено", fx_k_avg:"Среднее время ремонта", fx_k_avg_cap:"от сообщения до починки",
+    fx_k_parts:"Узлов затронуто", fx_k_parts_cap:"разных за период",
+    fx_open_h:"Сейчас не работает", fx_open_cap:"Нажмите «Починено», когда узел вернули в строй.",
+    fx_top:"Что ломается чаще всего", fx_top_cap:"За выбранный период. Красным — узел ломался больше трёх раз.",
+    fx_zone:"По участкам", fx_zone_cap:"Где сосредоточены простои.",
+    fx_hist:"История ремонтов", fx_hist_cap:"Кто починил и за сколько часов.",
+    fx_th_part:"Узел", fx_th_when:"Когда", fx_th_who:"Кто сообщил", fx_th_text:"Сообщение",
+    fx_th_times:"Раз", fx_th_avg:"Среднее", fx_th_took:"Ремонт", fx_th_by:"Кто починил", fx_th_cost:"Стоимость",
+    fx_done:"Починено", fx_still:"ещё открыто", fx_none:"Пока нет записей",
+    fx_ask_cost:"Сколько потратили на ремонт? Если не считали — оставьте 0.",
+    fx_err:"Не получилось сохранить",
     wipe_btn:"Начать с чистого листа", wipe_title:"Очистить все данные",
     wipe_text:"Будут удалены все партии, сырые сообщения, открытые заходы и незакрытые вопросы бота. Сушки, котлы и настройки останутся. Отменить это нельзя — если данные нужны, сначала выгрузите Excel.",
     wipe_ask:"Для подтверждения введите слово", wipe_go:"Очистить", wipe_cancel:"Отмена",
@@ -556,6 +588,20 @@ const I18N = {
     updated:"Yangilandi", period:"Davr", tz:"Vaqt mintaqasi",
     wait_h:"Boshlanish vaqtini kutmoqda",
     wait_hint:"«Stop» keldi, «Start» topilmadi — quritish vaqti hali hisoblanmagan. Guruhda botga javob qilib faqat vaqtni yuboring, masalan 23:26, partiya o'zi to'ldiriladi.",
+    fx_h:"Sexdagi nosozliklar",
+    fx_hint:"Yigitlar guruhga oddiy so'z bilan yozadi — bot uskunani tanib, statistikaga qo'shadi. Nima ko'p buziladi, qayerda va qancha vaqtda tuzatiladi.",
+    fx_k_open:"Ochiq nosozlik", fx_k_oldest:"eng eskisi", fx_k_period:"Davr ichida",
+    fx_k_fixed:"tuzatilgan", fx_k_avg:"O'rtacha tuzatish", fx_k_avg_cap:"yozilgandan tuzatilgungacha",
+    fx_k_parts:"Uskunalar", fx_k_parts_cap:"davr ichida turli xil",
+    fx_open_h:"Hozir ishlamayapti", fx_open_cap:"Uskuna ishga tushgach «Tuzatildi» ni bosing.",
+    fx_top:"Qaysi uskuna ko'p buziladi", fx_top_cap:"Tanlangan davr uchun. Qizil — uch martadan ko'p buzilgan.",
+    fx_zone:"Uchastkalar bo'yicha", fx_zone_cap:"To'xtash qayerda to'plangan.",
+    fx_hist:"Ta'mirlar tarixi", fx_hist_cap:"Kim tuzatdi va qancha vaqtda.",
+    fx_th_part:"Uskuna", fx_th_when:"Qachon", fx_th_who:"Kim yozdi", fx_th_text:"Xabar",
+    fx_th_times:"Marta", fx_th_avg:"O'rtacha", fx_th_took:"Ta'mir", fx_th_by:"Kim tuzatdi", fx_th_cost:"Xarajat",
+    fx_done:"Tuzatildi", fx_still:"hali ochiq", fx_none:"Hozircha yozuv yo'q",
+    fx_ask_cost:"Ta'mirga qancha ketdi? Hisoblamagan bo'lsangiz 0 qoldiring.",
+    fx_err:"Saqlanmadi",
     wipe_btn:"Toza varaqdan boshlash", wipe_title:"Barcha ma'lumotni tozalash",
     wipe_text:"Barcha partiyalar, xom xabarlar, ochiq startlar va botning javobsiz savollari o'chiriladi. Sushkalar, qozonlar va sozlamalar qoladi. Buni ortga qaytarib bo'lmaydi — kerak bo'lsa, avval Excelga yuklab oling.",
     wipe_ask:"Tasdiqlash uchun so'zni yozing", wipe_go:"Tozalash", wipe_cancel:"Bekor qilish",
@@ -926,6 +972,7 @@ function render(){
     </div>`;
 
   renderDryers();
+  renderFaults();
   renderCharts();
   renderTables();
 
@@ -1246,6 +1293,90 @@ function qualityPill(q){
   const map = {ok:["--good","✓"], defect:["--critical","⚠"], unknown:["--ink-muted","·"]};
   const [c,i] = map[q]||map.unknown;
   return `<span class="pill" style="color:${css(c)}">${i}<span class="qlabel"> ${esc(t("q_"+q))}</span></span>`;
+}
+
+/* ---- поломки в цехе ---- */
+/* здесь часы, а не минуты: у ремонта своя шкала — от «меньше часа» до дней */
+const fmtDur = h => h == null ? "—"
+  : h < 1 ? (LANG==="ru" ? "меньше часа" : "1 soatdan kam")
+  : h < 48 ? `${h.toFixed(h<10?1:0)} ${LANG==="ru"?"ч":"soat"}`
+  : `${(h/24).toFixed(1)} ${LANG==="ru"?"дн.":"kun"}`;
+
+async function faultPatch(id, body){
+  try{
+    const r = await fetch(`/api/faults/${id}`, {method:"PATCH",
+      headers:{"Content-Type":"application/json"}, body:JSON.stringify(body)});
+    if(!r.ok) throw new Error("HTTP "+r.status);
+    await load();
+  }catch(e){ alert(t("fx_err") + ": " + e.message); }
+}
+
+function renderFaults(){
+  const F = DATA.faults;
+  if(!F){ $("#secFix").style.display = "none"; return; }
+  $("#secFix").style.display = "";
+  const k = F.kpi;
+  $("#fxKpis").innerHTML = [
+    tile(t("fx_k_open"), k.open, k.open ? `${t("fx_k_oldest")}: ${fmtDur(k.oldest_hours)}` : "✓",
+         k.open ? "--critical" : null),
+    tile(t("fx_k_period"), k.period, `${t("fx_k_fixed")}: ${k.fixed}`),
+    tile(t("fx_k_avg"), k.avg_hours != null ? fmtDur(k.avg_hours) : "—", t("fx_k_avg_cap")),
+    tile(t("fx_k_parts"), (F.top || []).length, t("fx_k_parts_cap")),
+  ].join("");
+
+  const op = F.open || [];
+  $("#fxOpen").innerHTML = !op.length ? "" : `
+    <div class="warn" style="margin-top:12px">
+      <b>${esc(t("fx_open_h"))} — ${op.length}</b>
+      <p>${esc(t("fx_open_cap"))}</p>
+      <div class="tbl-wrap"><table><thead><tr>
+        <th>${t("fx_th_part")}</th><th>${t("fx_th_when")}</th><th>${t("fx_th_who")}</th>
+        <th>${t("fx_th_text")}</th><th></th></tr></thead><tbody>${op.map(f=>`
+        <tr><td><b>${esc(f.name)}</b><div class="muted" style="font-size:12px">${esc(f.zone||"")}</div></td>
+          <td style="white-space:nowrap">${fmtDate(f.reported_at)}<div class="muted" style="font-size:12px">${
+            fmtDur(f.open_hours)}</div></td>
+          <td>${esc(f.who)}</td>
+          <td class="muted">${esc((f.text||"").slice(0,70))}</td>
+          <td><button class="btn" data-fixid="${f.id}">${esc(t("fx_done"))}</button></td></tr>`).join("")}
+      </tbody></table></div>
+    </div>`;
+  document.querySelectorAll("[data-fixid]").forEach(b => b.onclick = () => {
+    const c = prompt(t("fx_ask_cost"), "0");
+    if(c === null) return;
+    faultPatch(+b.dataset.fixid, {status:"fixed", cost:+c || 0});
+  });
+
+  const top = F.top || [];
+  const max = top.length ? top[0].count : 1;
+  $("#fxTop").innerHTML = top.length ? `<table><thead><tr>
+    <th>${t("fx_th_part")}</th><th>${t("fx_th_times")}</th><th>${t("fx_th_avg")}</th></tr></thead>
+    <tbody>${top.map(r=>`<tr>
+      <td>${esc(r.name)}
+        <div style="height:5px;border-radius:3px;background:var(--line);margin-top:5px">
+          <div style="height:5px;border-radius:3px;width:${Math.round(100*r.count/max)}%;
+            background:${css(r.count>=3?"--critical":"--gold")}"></div></div></td>
+      <td><b>${r.count}</b>${r.open?` <span class="muted">(${r.open} ${t("fx_still")})</span>`:""}</td>
+      <td>${r.avg_hours!=null?fmtDur(r.avg_hours):"—"}</td></tr>`).join("")}</tbody></table>`
+    : `<p class="empty">${t("fx_none")}</p>`;
+
+  const z = F.zones || [];
+  const zmax = z.length ? z[0].count : 1;
+  $("#fxZones").innerHTML = z.length ? `<table><tbody>${z.map(r=>`<tr>
+    <td>${esc(r.zone||"—")}
+      <div style="height:5px;border-radius:3px;background:var(--line);margin-top:5px">
+        <div style="height:5px;border-radius:3px;width:${Math.round(100*r.count/zmax)}%;
+          background:${css("--accent")||css("--gold")}"></div></div></td>
+    <td><b>${r.count}</b></td></tr>`).join("")}</tbody></table>`
+    : `<p class="empty">${t("fx_none")}</p>`;
+
+  const hist = (F.recent || []).filter(f => f.status === "fixed");
+  $("#fxHist").innerHTML = hist.length ? `<div class="tbl-wrap"><table><thead><tr>
+    <th>${t("fx_th_part")}</th><th>${t("fx_th_when")}</th><th>${t("fx_th_took")}</th>
+    <th>${t("fx_th_by")}</th><th>${t("fx_th_cost")}</th></tr></thead><tbody>${hist.slice(0,40).map(f=>`
+    <tr><td>${esc(f.name)}</td><td class="muted">${fmtDate(f.reported_at)}</td>
+      <td>${f.hours!=null?fmtDur(f.hours):"—"}</td><td>${esc(f.fixed_by||"—")}</td>
+      <td>${f.cost?f.cost.toLocaleString("ru-RU"):"—"}</td></tr>`).join("")}</tbody></table></div>`
+    : `<p class="empty">${t("fx_none")}</p>`;
 }
 
 function renderTables(){

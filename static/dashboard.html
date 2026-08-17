@@ -306,6 +306,12 @@ dialog::backdrop{background:rgba(0,0,0,.45)}
   .grid31{grid-template-columns:1fr 1fr;gap:7px}
   .kpis{grid-template-columns:1fr 1fr}
 }
+.mot{display:flex;gap:14px;margin-top:6px}
+.mot-side{flex:1}
+.mot-h{font-size:12.5px;color:var(--ink-2);margin-bottom:6px;font-weight:600}
+.mot-c{display:flex;align-items:center;justify-content:space-between;gap:8px;
+  border:1px solid var(--border);border-radius:10px;padding:9px 11px;margin-bottom:6px}
+.mot-c b{font-size:14px} .mot-c span{font-size:14px;font-weight:700}
 #viewSeg b{margin-left:6px;font-size:11.5px;font-weight:700;padding:1px 6px;border-radius:20px;
   background:var(--critical);color:#fff;vertical-align:2px}
 #viewSeg b:empty{display:none}
@@ -348,17 +354,17 @@ dialog::backdrop{background:rgba(0,0,0,.45)}
   <div id="waiting" class="v-dry"></div>
 
   <section id="secFix" class="v-fix">
-    <h2 data-i="fx_h">Поломки в цехе</h2>
-    <p class="hint" data-i="fx_hint">Ребята пишут о поломке в группу обычными словами — бот узнаёт узел и собирает статистику. Что ломается чаще, где и как долго чинят.</p>
+    <h2 data-i="fx_h">Моторы сушек</h2>
+    <p class="hint" data-i="fx_hint">Ребята пишут в группу как привыкли — «13 sushka chap tarafdagi 3-mator buzildi». Бот сам разбирает номер сушки, сторону и номер мотора и собирает статистику.</p>
     <div class="kpis" id="fxKpis"></div>
     <div id="fxOpen"></div>
     <div class="cards" style="margin-top:14px">
-      <div class="card"><h3 data-i="fx_top">Что ломается чаще всего</h3>
-        <p class="cap" data-i="fx_top_cap">За выбранный период. Красным — узел ломался больше трёх раз.</p>
+      <div class="card"><h3 data-i="fx_top">Какая сушка ломается чаще</h3>
+        <p class="cap" data-i="fx_top_cap">За выбранный период. Красным — аппарат ломался больше трёх раз.</p>
         <div id="fxTop"></div></div>
-      <div class="card"><h3 data-i="fx_zone">По участкам</h3>
-        <p class="cap" data-i="fx_zone_cap">Где сосредоточены простои.</p>
-        <div id="fxZones"></div></div>
+      <div class="card"><h3 data-i="fx_slots">Какой мотор горит</h3>
+        <p class="cap" data-i="fx_slots_cap">У каждой сушки 6 моторов: 3 слева и 3 справа. Темнее — ломается чаще.</p>
+        <div id="fxSlots"></div></div>
       <div class="card wide"><h3 data-i="fx_hist">История ремонтов</h3>
         <p class="cap" data-i="fx_hist_cap">Кто починил и за сколько часов.</p>
         <div id="fxHist"></div></div>
@@ -529,16 +535,19 @@ const I18N = {
     wait_h:"Ждут время начала",
     wait_hint:"Пришёл «Stop», а «Start» к нему не нашёлся — время сушки пока не посчитано. Ответьте боту в группе одним временем, например 23:26, и партия достроится.",
     v_dry:"Сушка", v_fix:"Поломки",
-    fx_h:"Поломки в цехе",
-    fx_hint:"Ребята пишут о поломке в группу обычными словами — бот узнаёт узел и собирает статистику. Что ломается чаще, где и как долго чинят.",
+    fx_h:"Моторы сушек",
+    fx_hint:"Ребята пишут в группу как привыкли — «13 sushka chap tarafdagi 3-mator buzildi». Бот сам разбирает номер сушки, сторону и номер мотора.",
     fx_k_open:"Открытых поломок", fx_k_oldest:"самая старая", fx_k_period:"За период",
     fx_k_fixed:"починено", fx_k_avg:"Среднее время ремонта", fx_k_avg_cap:"от сообщения до починки",
-    fx_k_parts:"Узлов затронуто", fx_k_parts_cap:"разных за период",
-    fx_open_h:"Сейчас не работает", fx_open_cap:"Нажмите «Починено», когда узел вернули в строй.",
-    fx_top:"Что ломается чаще всего", fx_top_cap:"За выбранный период. Красным — узел ломался больше трёх раз.",
-    fx_zone:"По участкам", fx_zone_cap:"Где сосредоточены простои.",
-    fx_hist:"История ремонтов", fx_hist_cap:"Кто починил и за сколько часов.",
-    fx_th_part:"Узел", fx_th_when:"Когда", fx_th_who:"Кто сообщил", fx_th_text:"Сообщение",
+    fx_k_dryers:"Сушек затронуто", fx_k_dryers_cap:"разных за период",
+    fx_left:"Слева", fx_right:"Справа", fx_dryer:"сушка", fx_motor:"мотор",
+    fx_slots:"Какой мотор горит", fx_slots_cap:"У каждой сушки 6 моторов: 3 слева и 3 справа. Темнее — ломается чаще.",
+    fx_unknown:"Без номера сушки или мотора",
+    fx_th_place:"Место", fx_th_dryer:"Сушка",
+    fx_open_h:"Сейчас не работает", fx_open_cap:"Нажмите «Починено», когда мотор вернули в строй.",
+    fx_top:"Какая сушка ломается чаще", fx_top_cap:"За выбранный период. Красным — аппарат ломался больше трёх раз.",
+        fx_hist:"История ремонтов", fx_hist_cap:"Кто починил и за сколько часов.",
+    fx_th_when:"Когда", fx_th_who:"Кто сообщил", fx_th_text:"Сообщение",
     fx_th_times:"Раз", fx_th_avg:"Среднее", fx_th_took:"Ремонт", fx_th_by:"Кто починил", fx_th_cost:"Стоимость",
     fx_done:"Починено", fx_still:"ещё открыто", fx_none:"Пока нет записей",
     fx_ask_cost:"Сколько потратили на ремонт? Если не считали — оставьте 0.",
@@ -597,16 +606,19 @@ const I18N = {
     wait_h:"Boshlanish vaqtini kutmoqda",
     wait_hint:"«Stop» keldi, «Start» topilmadi — quritish vaqti hali hisoblanmagan. Guruhda botga javob qilib faqat vaqtni yuboring, masalan 23:26, partiya o'zi to'ldiriladi.",
     v_dry:"Quritish", v_fix:"Nosozlik",
-    fx_h:"Sexdagi nosozliklar",
-    fx_hint:"Yigitlar guruhga oddiy so'z bilan yozadi — bot uskunani tanib, statistikaga qo'shadi. Nima ko'p buziladi, qayerda va qancha vaqtda tuzatiladi.",
+    fx_h:"Sushka motorlari",
+    fx_hint:"Yigitlar guruhga odatdagidek yozadi — «13 sushka chap tarafdagi 3-mator buzildi». Bot sushka raqamini, tomonini va motor raqamini o'zi ajratadi.",
     fx_k_open:"Ochiq nosozlik", fx_k_oldest:"eng eskisi", fx_k_period:"Davr ichida",
     fx_k_fixed:"tuzatilgan", fx_k_avg:"O'rtacha tuzatish", fx_k_avg_cap:"yozilgandan tuzatilgungacha",
-    fx_k_parts:"Uskunalar", fx_k_parts_cap:"davr ichida turli xil",
-    fx_open_h:"Hozir ishlamayapti", fx_open_cap:"Uskuna ishga tushgach «Tuzatildi» ni bosing.",
-    fx_top:"Qaysi uskuna ko'p buziladi", fx_top_cap:"Tanlangan davr uchun. Qizil — uch martadan ko'p buzilgan.",
-    fx_zone:"Uchastkalar bo'yicha", fx_zone_cap:"To'xtash qayerda to'plangan.",
-    fx_hist:"Ta'mirlar tarixi", fx_hist_cap:"Kim tuzatdi va qancha vaqtda.",
-    fx_th_part:"Uskuna", fx_th_when:"Qachon", fx_th_who:"Kim yozdi", fx_th_text:"Xabar",
+    fx_k_dryers:"Sushkalar", fx_k_dryers_cap:"davr ichida turli xil",
+    fx_left:"Chap", fx_right:"O'ng", fx_dryer:"sushka", fx_motor:"motor",
+    fx_slots:"Qaysi motor kuyadi", fx_slots_cap:"Har bir sushkada 6 ta motor: 3 tasi chapda, 3 tasi o'ngda. To'qroq — ko'proq buziladi.",
+    fx_unknown:"Sushka yoki motor raqami yozilmagan",
+    fx_th_place:"Joyi", fx_th_dryer:"Sushka",
+    fx_open_h:"Hozir ishlamayapti", fx_open_cap:"Motor ishga tushgach «Tuzatildi» ni bosing.",
+    fx_top:"Qaysi sushka ko'p buziladi", fx_top_cap:"Tanlangan davr uchun. Qizil — uch martadan ko'p buzilgan apparat.",
+        fx_hist:"Ta'mirlar tarixi", fx_hist_cap:"Kim tuzatdi va qancha vaqtda.",
+    fx_th_when:"Qachon", fx_th_who:"Kim yozdi", fx_th_text:"Xabar",
     fx_th_times:"Marta", fx_th_avg:"O'rtacha", fx_th_took:"Ta'mir", fx_th_by:"Kim tuzatdi", fx_th_cost:"Xarajat",
     fx_done:"Tuzatildi", fx_still:"hali ochiq", fx_none:"Hozircha yozuv yo'q",
     fx_ask_cost:"Ta'mirga qancha ketdi? Hisoblamagan bo'lsangiz 0 qoldiring.",
@@ -1318,12 +1330,16 @@ function qualityPill(q){
   return `<span class="pill" style="color:${css(c)}">${i}<span class="qlabel"> ${esc(t("q_"+q))}</span></span>`;
 }
 
-/* ---- поломки в цехе ---- */
+/* ---- моторы сушек: 3 слева, 3 справа ---- */
 /* здесь часы, а не минуты: у ремонта своя шкала — от «меньше часа» до дней */
 const fmtDur = h => h == null ? "—"
   : h < 1 ? (LANG==="ru" ? "меньше часа" : "1 soatdan kam")
   : h < 48 ? `${h.toFixed(h<10?1:0)} ${LANG==="ru"?"ч":"soat"}`
   : `${(h/24).toFixed(1)} ${LANG==="ru"?"дн.":"kun"}`;
+
+const sideName = s => s === "chap" ? t("fx_left") : s === "ong" ? t("fx_right") : "—";
+const placeName = f => `${f.dryer ? f.dryer + "-" + t("fx_dryer") : "?"} · ${sideName(f.side)} · ${
+  f.motor ? f.motor : "?"}-${t("fx_motor")}`;
 
 async function faultPatch(id, body){
   try{
@@ -1345,7 +1361,7 @@ function renderFaults(){
          k.open ? "--critical" : null),
     tile(t("fx_k_period"), k.period, `${t("fx_k_fixed")}: ${k.fixed}`),
     tile(t("fx_k_avg"), k.avg_hours != null ? fmtDur(k.avg_hours) : "—", t("fx_k_avg_cap")),
-    tile(t("fx_k_parts"), (F.top || []).length, t("fx_k_parts_cap")),
+    tile(t("fx_k_dryers"), k.dryers, t("fx_k_dryers_cap")),
   ].join("");
 
   const op = F.open || [];
@@ -1354,13 +1370,13 @@ function renderFaults(){
       <b>${esc(t("fx_open_h"))} — ${op.length}</b>
       <p>${esc(t("fx_open_cap"))}</p>
       <div class="tbl-wrap"><table><thead><tr>
-        <th>${t("fx_th_part")}</th><th>${t("fx_th_when")}</th><th>${t("fx_th_who")}</th>
+        <th>${t("fx_th_place")}</th><th>${t("fx_th_when")}</th><th>${t("fx_th_who")}</th>
         <th>${t("fx_th_text")}</th><th></th></tr></thead><tbody>${op.map(f=>`
-        <tr><td><b>${esc(f.name)}</b><div class="muted" style="font-size:12px">${esc(f.zone||"")}</div></td>
+        <tr><td><b>${esc(placeName(f))}</b></td>
           <td style="white-space:nowrap">${fmtDate(f.reported_at)}<div class="muted" style="font-size:12px">${
             fmtDur(f.open_hours)}</div></td>
           <td>${esc(f.who)}</td>
-          <td class="muted">${esc((f.text||"").slice(0,70))}</td>
+          <td class="muted">${esc((f.text||"").slice(0,60))}</td>
           <td><button class="btn" data-fixid="${f.id}">${esc(t("fx_done"))}</button></td></tr>`).join("")}
       </tbody></table></div>
     </div>`;
@@ -1370,12 +1386,13 @@ function renderFaults(){
     faultPatch(+b.dataset.fixid, {status:"fixed", cost:+c || 0});
   });
 
-  const top = F.top || [];
-  const max = top.length ? top[0].count : 1;
-  $("#fxTop").innerHTML = top.length ? `<table><thead><tr>
-    <th>${t("fx_th_part")}</th><th>${t("fx_th_times")}</th><th>${t("fx_th_avg")}</th></tr></thead>
-    <tbody>${top.map(r=>`<tr>
-      <td>${esc(r.name)}
+  /* какая сушка ломается чаще */
+  const dr = F.dryers || [];
+  const max = dr.length ? dr[0].count : 1;
+  $("#fxTop").innerHTML = dr.length ? `<table><thead><tr>
+    <th>${t("fx_th_dryer")}</th><th>${t("fx_th_times")}</th><th>${t("fx_th_avg")}</th></tr></thead>
+    <tbody>${dr.slice(0,12).map(r=>`<tr>
+      <td>№${r.dryer}
         <div style="height:5px;border-radius:3px;background:var(--line);margin-top:5px">
           <div style="height:5px;border-radius:3px;width:${Math.round(100*r.count/max)}%;
             background:${css(r.count>=3?"--critical":"--gold")}"></div></div></td>
@@ -1383,21 +1400,26 @@ function renderFaults(){
       <td>${r.avg_hours!=null?fmtDur(r.avg_hours):"—"}</td></tr>`).join("")}</tbody></table>`
     : `<p class="empty">${t("fx_none")}</p>`;
 
-  const z = F.zones || [];
-  const zmax = z.length ? z[0].count : 1;
-  $("#fxZones").innerHTML = z.length ? `<table><tbody>${z.map(r=>`<tr>
-    <td>${esc(r.zone||"—")}
-      <div style="height:5px;border-radius:3px;background:var(--line);margin-top:5px">
-        <div style="height:5px;border-radius:3px;width:${Math.round(100*r.count/zmax)}%;
-          background:${css("--accent")||css("--gold")}"></div></div></td>
-    <td><b>${r.count}</b></td></tr>`).join("")}</tbody></table>`
+  /* какое место горит: 3 слева и 3 справа */
+  const sl = F.slots || [];
+  const smax = Math.max(1, ...sl.map(x=>x.count));
+  $("#fxSlots").innerHTML = sl.length ? `
+    <div class="mot">${["chap","ong"].map(sd=>`
+      <div class="mot-side"><div class="mot-h">${esc(sideName(sd))}</div>
+        ${sl.filter(x=>x.side===sd).map(x=>`
+          <div class="mot-c" style="background:${x.count
+            ? `color-mix(in srgb, ${css(x.count>=3?"--critical":"--gold")} ${Math.round(18+72*x.count/smax)}%, transparent)`
+            : "transparent"}">
+            <b>${x.motor}</b><span>${x.count||"—"}</span></div>`).join("")}
+      </div>`).join("")}</div>
+    ${F.unknown ? `<p class="cap" style="margin-top:8px">${t("fx_unknown")}: ${F.unknown}</p>` : ""}`
     : `<p class="empty">${t("fx_none")}</p>`;
 
   const hist = (F.recent || []).filter(f => f.status === "fixed");
   $("#fxHist").innerHTML = hist.length ? `<div class="tbl-wrap"><table><thead><tr>
-    <th>${t("fx_th_part")}</th><th>${t("fx_th_when")}</th><th>${t("fx_th_took")}</th>
+    <th>${t("fx_th_place")}</th><th>${t("fx_th_when")}</th><th>${t("fx_th_took")}</th>
     <th>${t("fx_th_by")}</th><th>${t("fx_th_cost")}</th></tr></thead><tbody>${hist.slice(0,40).map(f=>`
-    <tr><td>${esc(f.name)}</td><td class="muted">${fmtDate(f.reported_at)}</td>
+    <tr><td>${esc(placeName(f))}</td><td class="muted">${fmtDate(f.reported_at)}</td>
       <td>${f.hours!=null?fmtDur(f.hours):"—"}</td><td>${esc(f.fixed_by||"—")}</td>
       <td>${f.cost?f.cost.toLocaleString("ru-RU"):"—"}</td></tr>`).join("")}</tbody></table></div>`
     : `<p class="empty">${t("fx_none")}</p>`;

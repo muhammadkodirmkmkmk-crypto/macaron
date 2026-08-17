@@ -146,19 +146,20 @@ class StopEvent(Base):
     created_at: Mapped[dt.datetime] = mapped_column(DateTime, default=utcnow)
 
 
-class Fault(Base):
-    """Поломка в цехе: пришла из рабочей группы или отмечена в дашборде."""
+class MotorFault(Base):
+    """Сломался мотор сушки. У аппарата их шесть: 3 слева и 3 справа."""
 
-    __tablename__ = "faults"
+    __tablename__ = "motor_faults"
 
     id: Mapped[int] = mapped_column(Integer, primary_key=True)
-    part: Mapped[str] = mapped_column(String(40), index=True)      # ключ узла из parts.PARTS
-    text: Mapped[str | None] = mapped_column(Text)                 # что написали своими словами
-    zone: Mapped[str | None] = mapped_column(String(64), index=True)
+    dryer: Mapped[int | None] = mapped_column(Integer, index=True)     # номер сушки
+    side: Mapped[str | None] = mapped_column(String(8), index=True)    # chap | ong
+    motor: Mapped[int | None] = mapped_column(Integer, index=True)     # 1..3 на своей стороне
+    text: Mapped[str | None] = mapped_column(Text)                     # как написали
 
     reported_at: Mapped[dt.datetime] = mapped_column(DateTime, index=True)
     fixed_at: Mapped[dt.datetime | None] = mapped_column(DateTime, index=True)
-    status: Mapped[str] = mapped_column(String(10), default="open", index=True)   # open | fixed
+    status: Mapped[str] = mapped_column(String(10), default="open", index=True)
 
     who: Mapped[str | None] = mapped_column(String(128))
     fixed_by: Mapped[str | None] = mapped_column(String(128))
@@ -166,11 +167,11 @@ class Fault(Base):
 
     chat_id: Mapped[int | None] = mapped_column(BigInteger, index=True)
     message_id: Mapped[int | None] = mapped_column(BigInteger)
-    source: Mapped[str] = mapped_column(String(16), default="telegram")   # telegram | web
+    source: Mapped[str] = mapped_column(String(16), default="telegram")
     created_at: Mapped[dt.datetime] = mapped_column(DateTime, default=utcnow)
 
 
-Index("ix_faults_part_time", Fault.part, Fault.reported_at)
+Index("ix_motor_faults_place", MotorFault.dryer, MotorFault.side, MotorFault.motor)
 
 
 class DryerMeta(Base):

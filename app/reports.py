@@ -5,7 +5,7 @@ import datetime as dt
 
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from . import analytics, config, faults, parts
+from . import analytics, config, motors
 
 
 def fmt_dur(minutes: int | None) -> str:
@@ -37,14 +37,15 @@ async def today_summary(s: AsyncSession) -> str:
             lines.append(f"• {p['product']}: {p['count']} ta · o'rt. {fmt_dur(p['avg'])}")
     if k["needs_review"]:
         lines.append(f"\n⚠️ Tekshirish kerak: {k['needs_review']} ta yozuv")
-    fx = await faults.open_rows(s)
+    fx = await motors.open_rows(s)
     if fx:
         top = {}
         for f in fx:
-            top[f.part] = top.get(f.part, 0) + 1
+            key = f"{f.dryer or '?'}-sushka"
+            top[key] = top.get(key, 0) + 1
         first = sorted(top.items(), key=lambda kv: -kv[1])[:3]
-        lines.append("\n🔧 Ochiq nosozlik: <b>" + str(len(fx)) + "</b> — " + ", ".join(
-            parts.NAMES.get(k2, k2) + (f" ×{v}" if v > 1 else "") for k2, v in first))
+        lines.append("\n🔧 Ochiq motor nosozligi: <b>" + str(len(fx)) + "</b> — " + ", ".join(
+            k2 + (f" ×{v}" if v > 1 else "") for k2, v in first))
     if config.PUBLIC_URL:
         lines.append(f"\n📈 {config.PUBLIC_URL}")
     return "\n".join(lines)

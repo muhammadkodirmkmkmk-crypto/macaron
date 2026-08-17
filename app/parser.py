@@ -239,6 +239,12 @@ NOT_PRODUCT = {
     "yopildi", "yopilgan", "ochildi", "ochilgan", "boshlandi", "solindi",
     "trewena", "trewna", "tresna", "treshina", "yoriq", "brak", "брак",
     "bordi", "yaxshi", "zo'r", "salom", "rahmat", "bo'ldi", "boldi",
+    # слова про моторы: их нельзя принимать за название продукта
+    "mator", "matori", "motor", "motori", "matorlar", "матор", "мотор",
+    "матори", "мотори", "chap", "chapdagi", "tarafdagi", "tomon", "tomondagi",
+    "чапдаги", "тарафдаги", "томон", "o'ng", "ong", "ung", "ўнг", "унг",
+    "buzildi", "buzuq", "ishlamayapti", "ishlamadi", "sindi", "kuydi",
+    "бузилди", "ишламаяпти", "синди", "куйди", "шовкин", "шовқин",
 }
 WORD_RE = re.compile(r"[A-Za-zА-Яа-яЁёЎўҚқҒғҲҳ'’`]{4,}", re.U)
 

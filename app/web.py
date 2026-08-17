@@ -9,8 +9,8 @@ from fastapi import Body, FastAPI, HTTPException, Query, Request, Response
 from fastapi.responses import FileResponse, HTMLResponse, JSONResponse, StreamingResponse
 from sqlalchemy import select
 
-from . import analytics, config, faults as faults_mod
-from .db import Batch, Fault, session
+from . import analytics, config, motors
+from .db import Batch, MotorFault, session
 
 STATIC = config.BASE_DIR / "static"
 COOKIE = "makaron_auth"
@@ -156,38 +156,44 @@ button:active{opacity:.85}
     async def api_dashboard(days: int = Query(30, ge=1, le=365)):
         async with session() as s:
             data = await analytics.dashboard_payload(s, days=days)
-            data["faults"] = await faults_mod.payload(s, days=days)
+            data["faults"] = await motors.payload(s, days=days)
             return data
 
     # ---------------- поломки в цехе ----------------
     @app.get("/api/faults")
     async def api_faults(days: int = Query(30, ge=1, le=365)):
         async with session() as s:
-            return await faults_mod.payload(s, days=days)
+            return await motors.payload(s, days=days)
 
     @app.post("/api/faults")
     async def api_fault_add(payload: dict = Body(...)):
-        part = (payload.get("part") or "").strip()
+        """С дашборда или разбором текста: «13 sushka chap 3-mator buzildi»."""
         text = (payload.get("text") or "").strip()
-        if not part:
-            raise HTTPException(400, "part kerak")
+        hit = motors.parse(text) if text else None
+        dryer = payload.get("dryer") if payload.get("dryer") is not None else (hit or {}).get("dryer")
+        side = payload.get("side") or (hit or {}).get("side")
+        motor = payload.get("motor") if payload.get("motor") is not None else (hit or {}).get("motor")
+        if dryer is None and motor is None and not text:
+            raise HTTPException(400, "sushka yoki motor kerak")
         async with session() as s:
-            row = await faults_mod.add(s, part=part, text=text,
-                                       who=(payload.get("who") or "Dashboard"), source="web")
+            row = await motors.add(s, dryer=int(dryer) if dryer else None,
+                                   side=side if side in motors.SIDES else None,
+                                   motor=int(motor) if motor else None, text=text,
+                                   who=(payload.get("who") or "Dashboard"), source="web")
             await s.commit()
-            return faults_mod.serialize(row)
+            return motors.serialize(row)
 
     @app.patch("/api/faults/{fault_id}")
     async def api_fault_patch(fault_id: int, payload: dict = Body(...)):
         async with session() as s:
-            row = await s.get(Fault, fault_id)
+            row = await s.get(MotorFault, fault_id)
             if not row:
                 raise HTTPException(404, "topilmadi")
             if "status" in payload:
                 st = payload["status"]
                 if st == "fixed" and row.status != "fixed":
                     row.status = "fixed"
-                    row.fixed_at = faults_mod.utcnow()
+                    row.fixed_at = motors.utcnow()
                     row.fixed_by = (payload.get("fixed_by") or "Dashboard")[:128]
                 elif st == "open":
                     row.status, row.fixed_at, row.fixed_by = "open", None, None
@@ -196,12 +202,12 @@ button:active{opacity:.85}
             if payload.get("text"):
                 row.text = str(payload["text"])[:500]
             await s.commit()
-            return faults_mod.serialize(row)
+            return motors.serialize(row)
 
     @app.delete("/api/faults/{fault_id}")
     async def api_fault_delete(fault_id: int):
         async with session() as s:
-            row = await s.get(Fault, fault_id)
+            row = await s.get(MotorFault, fault_id)
             if not row:
                 raise HTTPException(404, "topilmadi")
             await s.delete(row)

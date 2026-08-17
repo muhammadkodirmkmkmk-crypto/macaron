@@ -80,13 +80,42 @@ def boiler_of(n: int | None) -> int | None:
 
 # Известные виды макарон. Парсер сначала ищет их, потом отдаёт текст модели.
 KNOWN_PRODUCTS = _csv("PRODUCTS") or [
-    "Burama", "Pero", "Pautinka", "Spiral", "Rojok", "Rakushka", "Zirak",
-    "Qochqor", "Zvezda", "Vermishel", "Lapsha", "Bantik", "Nay", "Gulcha",
-    "Yulduzcha", "Qalampir", "Cho'p", "Uzun", "Qisqa", "Trubka",
+    # то, что фабрика делает на самом деле — как в системе продаж
+    "Quchqor", "Pero", "Kalta Pero", "Speral", "Burama", "Trupka", "Zirak",
+    "Rochki", "Rakushka", "Gladkiy", "Manpar", "Vidkiy", "Gildirak",
+    "Lapsha", "Pautinka", "Vermishel", "Spagetti", "Chiqindi",
+    # встречались в переписке
+    "Zvezda", "Bantik", "Nay", "Gulcha", "Yulduzcha", "Qalampir",
 ]
 
 # Синонимы и опечатки -> канонический продукт
 PRODUCT_ALIASES = {
+    # как это пишут в группе: латиница, кириллица, описки
+    "quchqor": "Quchqor", "qochqor": "Quchqor", "kochkor": "Quchqor",
+    "qo'chqor": "Quchqor", "qochkor": "Quchqor", "кочкор": "Quchqor",
+    "качкор": "Quchqor", "quchqar": "Quchqor", "qo'chqar": "Quchqor",
+    "кучкар": "Quchqor", "кучкор": "Quchqor", "кўчқор": "Quchqor",
+    "kalta pero": "Kalta Pero", "kaltapero": "Kalta Pero",
+    "калта перо": "Kalta Pero", "калтаперо": "Kalta Pero",
+    "kalta": "Kalta Pero",
+    "speral": "Speral", "spiral": "Speral", "спираль": "Speral",
+    "спирал": "Speral", "sperale": "Speral", "sprial": "Speral",
+    "trupka": "Trupka", "trubka": "Trupka", "трупка": "Trupka",
+    "трубка": "Trupka", "trupca": "Trupka",
+    "rochki": "Rochki", "рочки": "Rochki", "rojki": "Rochki",
+    "rojok": "Rochki", "рожки": "Rochki", "рожок": "Rochki",
+    "gladkiy": "Gladkiy", "gladki": "Gladkiy", "гладкий": "Gladkiy",
+    "гладки": "Gladkiy", "glatkiy": "Gladkiy",
+    "manpar": "Manpar", "манпар": "Manpar", "manpr": "Manpar",
+    "vidkiy": "Vidkiy", "vitkiy": "Vidkiy", "видкий": "Vidkiy",
+    "витким": "Vidkiy", "видки": "Vidkiy",
+    "gildirak": "Gildirak", "гилдирак": "Gildirak", "ғилдирак": "Gildirak",
+    "gildrak": "Gildirak", "gildarak": "Gildirak", "гильдирак": "Gildirak",
+    "zrak": "Zirak", "зрак": "Zirak", "zirak": "Zirak", "зирак": "Zirak",
+    "spagetti": "Spagetti", "спагетти": "Spagetti", "spagetdi": "Spagetti",
+    "спагети": "Spagetti", "spageti": "Spagetti",
+    "chiqindi": "Chiqindi", "чикинди": "Chiqindi", "чиқинди": "Chiqindi",
+    "chikindi": "Chiqindi", "otxod": "Chiqindi", "отход": "Chiqindi",
     "burama": "Burama", "борама": "Burama", "burma": "Burama",
     "zirak": "Zirak", "зирак": "Zirak", "zirek": "Zirak", "ziyrak": "Zirak",
     "qochqor": "Qochqor", "kochkor": "Qochqor", "qo'chqor": "Qochqor",

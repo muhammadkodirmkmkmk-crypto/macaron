@@ -28,8 +28,15 @@ MIN_RE = re.compile(
     r"(\d{1,3})\s*(?:minut(?:da|ga)?|min\b|мин(?:ут[аы]?)?|daqiqa|daq\b)", re.I | re.U
 )
 CLOCK_RE = re.compile(r"\b(\d{1,2})\s*[:.\-]\s*(\d{2})\b")
+# номер ПОСЛЕ слова: «sushka 12», «№12»
 DRYER_IN_TEXT_RE = re.compile(
-    r"(?:sushka|sushk[ai]|сушк[аи]|№|#|nomer|nomeri|raqam)\s*[-:\s]*(\d{1,2})", re.I | re.U
+    r"(?:sushka|sushk[ai]|сушк[аи]|№|#|nomer|nomeri|raqam)\s*[-:\s]*(\d{1,2})(?!\s*[:.]\s*\d)",
+    re.I | re.U
+)
+# номер ПЕРЕД словом: «12 sushka», «12-sushka», «7 apparat» — так пишут чаще
+DRYER_BEFORE_RE = re.compile(
+    r"(?<![\d:.])(\d{1,2})\s*[-–—]?\s*(?:sushka\w*|сушк\w*|apparat\w*|аппарат\w*|kamera\w*|камер\w*)",
+    re.I | re.U
 )
 
 # --- часы захода и выхода: "00:28 kirgan 10:30 chiqdi burama" ---
@@ -160,7 +167,12 @@ def dryer_hint(text: str) -> int | None:
     любое отдельно стоящее число (часы туда не попадают, единицы времени отсекаем)."""
     if not text:
         return None
-    m = DRYER_IN_TEXT_RE.search(text)
+    m = DRYER_BEFORE_RE.search(text)          # «12 sushka» — номер стоит первым
+    if m:
+        n = int(m.group(1))
+        if 1 <= n <= config.DRYER_COUNT:
+            return n
+    m = DRYER_IN_TEXT_RE.search(text)          # «sushka 12», «№12»
     if m:
         n = int(m.group(1))
         if 1 <= n <= config.DRYER_COUNT:
@@ -353,7 +365,7 @@ def parse_text(text: str) -> Parsed:
 
     # Заметка = остаток текста после вырезания понятых кусков
     note = clean
-    for rx in (HOUR_RE, MIN_RE, DONE_RE, DRYER_IN_TEXT_RE):
+    for rx in (HOUR_RE, MIN_RE, DONE_RE, DRYER_BEFORE_RE, DRYER_IN_TEXT_RE):
         note = rx.sub(" ", note)
     if p.product:
         note = re.sub(re.escape(p.product), " ", note, flags=re.I)

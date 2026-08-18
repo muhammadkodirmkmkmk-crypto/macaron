@@ -93,7 +93,8 @@ async def cmd_start(msg: Message):
         "🔧 <b>Motor buzilsa</b> — shunchaki yozing:\n"
         "<code>13 sushka chap tarafdagi 3-mator buzildi</code>\n"
         "Sushka raqamini, tomonini va motor raqamini o'zim ajratib olaman.\n"
-        "Tuzatilgach: <code>/tuzatildi 12</code>\n\n"
+        "Tuzatilgach shunchaki yozing: <code>1 sushka chap 1 mator tuzatildi</code>\n"
+        "yoki <code>Tuzatildi 12</code>, yoki mening xabarimga javob qilib «tuzatildi».\n\n"
         "Buyruqlar: /stats /sushka /oxirgi /dash /nosozlik /reset /id"
     )
 
@@ -183,23 +184,91 @@ async def cmd_faults(msg: Message):
                      "\n\nTuzatilgach: <code>/tuzatildi 12</code>")
 
 
+async def _close_fault(s, f: MotorFault, who: str) -> str:
+    f.status = "fixed"
+    f.fixed_at = motors.utcnow()
+    f.fixed_by = who
+    h = (f.fixed_at - f.reported_at).total_seconds() / 3600
+    when = f"{h:.1f} soat" if h < 48 else f"{h/24:.1f} kun"
+    return f"#{f.id} {motors.title(f.dryer, f.side, f.motor)} — {when}"
+
+
+async def _find_open(s, *, fid=None, dryer=None, side=None, motor=None):
+    """Ищем открытую запись: по номеру или по месту (сушка · сторона · мотор)."""
+    if fid:
+        f = await s.get(MotorFault, int(fid))
+        return f if f and f.status == "open" else None
+    rows = await motors.open_rows(s)
+    if dryer:
+        rows = [f for f in rows if f.dryer == dryer]
+    if side:
+        rows = [f for f in rows if f.side == side]
+    if motor:
+        rows = [f for f in rows if f.motor == motor]
+    return rows[0] if len(rows) >= 1 else None
+
+
+async def _try_fixed(msg: Message, text: str) -> bool:
+    """«1 sushka chap 1 mator tuzatildi», «Tuzatildi 2» или ответ на сообщение бота."""
+    hit = motors.parse_fixed(text)
+    if not hit:
+        return False
+    # ответ на «Yozib oldim … (#12)» — номер берём оттуда
+    if not hit["id"] and msg.reply_to_message:
+        rt = (msg.reply_to_message.text or msg.reply_to_message.caption or "")
+        m = re.search(r"[#№]\s*(\d{1,5})", rt)
+        if m:
+            hit["id"] = int(m.group(1))
+    has_place = any(hit[k] for k in ("dryer", "side", "motor"))
+    if not hit["id"] and not has_place:
+        if not hit.get("strong"):
+            return False        # слишком расплывчато — не трогаем
+        # «tuzatildi» без уточнений: закрываем, только если открыта ровно одна
+        async with session() as s:
+            rows = await motors.open_rows(s)
+        if len(rows) != 1:
+            if not rows:
+                return False
+            await msg.reply("Qaysi biri tuzatildi? Raqamini yozing: <code>/tuzatildi 12</code>\n"
+                            "Ro'yxat: /nosozlik")
+            return True
+        hit["id"] = rows[0].id
+
+    async with session() as s:
+        f = await _find_open(s, fid=hit["id"], dryer=hit["dryer"],
+                             side=hit["side"], motor=hit["motor"])
+        if not f:
+            await s.commit()
+            await msg.reply("Bunday ochiq nosozlik topilmadi. Ro'yxat: /nosozlik")
+            return True
+        line = await _close_fault(s, f, _uname(msg))
+        await s.commit()
+    await msg.reply(f"✅ Tuzatildi: {line}")
+    return True
+
+
 @router.message(Command("tuzatildi", "tuzat", "tuzatdim"))
 async def cmd_fault_fix(msg: Message):
     nums = [w.strip("#№.,") for w in (msg.text or "").split()[1:]]
     nums = [int(w) for w in nums if w.isdigit()]
+    if not nums and msg.reply_to_message:      # ответ на сообщение бота
+        m = re.search(r"[#№]\s*(\d{1,5})", msg.reply_to_message.text or "")
+        if m:
+            nums = [int(m.group(1))]
     if not nums:
-        return await msg.answer("Qaysi nosozlik? Masalan: <code>/tuzatildi 12</code>\nRo'yxat: /nosozlik")
+        async with session() as s:
+            rows = await motors.open_rows(s)
+        if len(rows) == 1:
+            nums = [rows[0].id]
+        else:
+            return await msg.answer("Qaysi nosozlik? Masalan: <code>/tuzatildi 12</code>\nRo'yxat: /nosozlik")
     done = []
     async with session() as s:
         for n in nums:
             f = await s.get(MotorFault, n)
             if not f or f.status == "fixed":
                 continue
-            f.status = "fixed"
-            f.fixed_at = motors.utcnow()
-            f.fixed_by = _uname(msg)
-            h = (f.fixed_at - f.reported_at).total_seconds() / 3600
-            done.append(f"#{f.id} {motors.title(f.dryer, f.side, f.motor)} — {h:.1f} soat")
+            done.append(await _close_fault(s, f, _uname(msg)))
         await s.commit()
     await msg.answer(("✅ Tuzatildi:\n" + "\n".join(done)) if done
                      else "Bunday ochiq nosozlik topilmadi. Ro'yxat: /nosozlik")
@@ -219,7 +288,8 @@ async def _try_motor(msg: Message, text: str) -> bool:
         fid, dryer = row.id, row.dryer
     tail = ("\nQaysi sushka ekanini ham yozib qo'ying." if not dryer else "")
     await msg.reply(f"🔧 Yozib oldim: <b>{motors.title(hit['dryer'], hit['side'], hit['motor'])}</b> "
-                    f"(#{fid}){tail}\nTuzatilgach: <code>/tuzatildi {fid}</code>")
+                    f"(#{fid}){tail}\nTuzatilgach yozing: <code>Tuzatildi {fid}</code> "
+                    f"yoki shu xabarga javob qilib «tuzatildi»")
     return True
 
 
@@ -896,8 +966,11 @@ async def on_report_message(msg: Message, bot: Bot):
 
     if not parser.is_report_message(caption, has_photo):
         # не отчёт о сушке — может быть, это поломка: «elak setkasi yirtildi»
-        if caption and not caption.startswith("/") and await _try_motor(msg, caption):
-            return
+        if caption and not caption.startswith("/"):
+            if await _try_fixed(msg, caption):     # «… mator tuzatildi», «Tuzatildi 2»
+                return
+            if await _try_motor(msg, caption):     # «… mator buzildi»
+                return
         # в личке всё, что не отчёт, — это вопрос к ассистенту
         if private and caption and config.ASSISTANT_ENABLED:
             await _ask_assistant(msg, caption)

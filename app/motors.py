@@ -42,6 +42,56 @@ BREAK_RE = re.compile(
 
 NUM_RE = re.compile(r"\d{1,2}")
 
+# «tuzatildi», «tuzatdik», «ishlayapti», «починили» — мотор вернули в строй
+# Слова про починку. «tayyor», «bo'ldi», «готово» сюда НЕ берём: так пишут
+# про готовую партию макарон, а не про мотор.
+FIXED_RE = re.compile(
+    r"(?:tuzatildi|tuzatdik|tuzatdim|tuzatib\s*qo|tuzaldi|to['`’]?g['`’]?rilandi|togrilandi|"
+    r"almashtirildi|almashtirdik|almashdik|ishlayapti|ishladi|ishga\s*tush\w*|"
+    r"тузатилди|тузатдик|тузатдим|тузатиб|алмаштирилди|алмаштирдик|"
+    r"ишлаяпти|ишлади|ишга\s*туш\w*|"
+    r"почин\w*|исправ\w*|заработал\w*|поменял\w*|заменил\w*|fixed)", re.I | re.U)
+
+# Однозначные слова: только с ними закрываем запись, если ничего не уточнили
+STRONG_FIX_RE = re.compile(
+    r"(?:tuzatildi|tuzatdik|tuzatdim|tuzaldi|almashtirildi|almashtirdik|"
+    r"тузатилди|тузатдик|тузатдим|алмаштирилди|почин\w*|исправ\w*|fixed)", re.I | re.U)
+
+# номер записи: «#12», «tuzatildi 12», «12 tuzatildi»
+ID_RE = re.compile(r"[#№]\s*(\d{1,5})")
+
+
+def parse_fixed(text: str) -> dict | None:
+    """Написали, что починили. Возвращает, что удалось понять: номер записи и/или место.
+
+    None — если про починку речи нет.
+    """
+    t = (text or "").strip()
+    if not t or not FIXED_RE.search(t):
+        return None
+    low = t.lower()
+    out = {"id": None, "dryer": None, "side": None, "motor": None, "text": t[:500],
+           "strong": bool(STRONG_FIX_RE.search(t))}
+
+    m = ID_RE.search(low)
+    if m:
+        out["id"] = int(m.group(1))
+
+    has_place = bool(DRYER_RE.search(low) or MOTOR_RE.search(low)
+                     or LEFT_RE.search(low) or RIGHT_RE.search(low))
+    if has_place:
+        # разбираем так же, как поломку: сушка, сторона, мотор
+        fake = t + " buzildi"          # BREAK_RE нужен только для отсева болтовни
+        hit = parse(fake)
+        if hit:
+            out.update({k: hit[k] for k in ("dryer", "side", "motor")})
+    elif out["id"] is None:
+        # «Tuzatildi 2» — одно число и никаких слов о месте: это номер записи
+        nums = [int(x) for x in NUM_RE.findall(low)]
+        if len(nums) == 1:
+            out["id"] = nums[0]
+    return out
+
 
 def _near(text: str, pos: int, span: int = 18) -> str:
     return text[max(0, pos - span): pos + span]

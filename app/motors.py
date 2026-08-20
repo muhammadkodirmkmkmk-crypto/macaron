@@ -21,8 +21,8 @@ SIDE_NAME = {"chap": {"uz": "Chap", "ru": "Левая"}, "ong": {"uz": "O'ng", "
 
 # как в жизни пишут «мотор»
 MOTOR_RE = re.compile(
-    r"(?:mator|matori|motor|motori|mtr|двигател\w*|"
-    r"матор\w*|мотор\w*|дигател\w*)", re.I | re.U)
+    r"(?:mator\w*|motor\w*|matr\w*|motr\w*|mtr\b|dvigat\w*|"
+    r"матор\w*|мотор\w*|двигател\w*|дигател\w*)", re.I | re.U)
 # сушка / аппарат / камера
 DRYER_RE = re.compile(r"(?:sushka\w*|sushk|сушк\w*|apparat\w*|аппарат\w*|kamera\w*|камер\w*)", re.I | re.U)
 # слева
@@ -32,13 +32,16 @@ RIGHT_RE = re.compile(r"(?:o['`’]?ng\w*|ung\w*|ong\w*|ўнг\w*|унг\w*|он
                       re.I | re.U)
 # поломка: без этих слов сообщение о моторе — просто разговор
 BREAK_RE = re.compile(
-    r"(?:buzildi|buzuq|buzilib|ishlamay\w*|ishlamadi|yonib\w*|kuyd\w*|kuyib|yond\w*|"
-    r"sindi|singan|to'xtad\w*|toxtad\w*|shovqin\w*|qizib\w*|nosoz\w*|remont\w*|"
-    r"бузилди|бузуқ|ишламай\w*|ишламади|куйди|куйиб|синди|тухтад\w*|шовқин\w*|"
-    r"сломал\w*|не работает|неработает|горит|сгорел\w*|шумит|греет\w*|встал|стал\b|"
-    r"проблем\w*|полом\w*|remont|таъмир\w*|шовкин\w*|шовқин\w*|"
-    r"o['`’]?chib\w*|o['`’]?chdi|uchib\w*|ketdi|kesildi|tushib\w*|"
-    r"ўчиб\w*|учиб\w*|тушиб\w*|кетди|ишдан\s*чиқ\w*|ishdan\s*chiq\w*)", re.I | re.U)
+    r"(?:buz\w*|buzld\w*|ishlamay\w*|ishlamad\w*|ishlamay|ishlmay\w*|"
+    r"yonib\w*|yond\w*|kuyd\w*|kuyib\w*|kuygan|sind\w*|singan|"
+    r"to['`’]?xtad\w*|toxtad\w*|shovqin\w*|shovkin\w*|qizib\w*|qizd\w*|"
+    r"nosoz\w*|remont\w*|problem\w*|xarob\w*|"
+    r"буз\w*|ишламай\w*|ишламад\w*|куйд\w*|куйиб\w*|синд\w*|синган|"
+    r"тухтад\w*|тўхтад\w*|шовқин\w*|шовкин\w*|носоз\w*|"
+    r"сломал\w*|не\s*работает|неработает|горит|сгорел\w*|шумит|греет\w*|встал|стал\b|"
+    r"проблем\w*|полом\w*|таъмир\w*|"
+    r"o['`’]?chib\w*|o['`’]?chd\w*|uchib\w*|ketdi|kesild\w*|tushib\w*|tushd\w*|"
+    r"ўчиб\w*|учиб\w*|тушиб\w*|тушди|кетди|ишдан\s*чиқ\w*|ishdan\s*chiq\w*)", re.I | re.U)
 
 NUM_RE = re.compile(r"\d{1,2}")
 

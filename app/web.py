@@ -114,7 +114,7 @@ button:active{opacity:.85}
                 "cycle_minutes": config.NORM_CYCLE_MINUTES,
             },
             "stale_hours": config.STALE_HOURS,
-            "vision": {"enabled": config.VISION_ENABLED, "model": config.ANTHROPIC_MODEL},
+            "vision": {"enabled": config.VISION_ENABLED, "model": config.VISION_MODEL},
             "assistant": {"enabled": config.ASSISTANT_ENABLED, "model": config.ASSISTANT_MODEL},
             "telegram_bot": bool(config.TELEGRAM_BOT_TOKEN),
         }

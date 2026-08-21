@@ -37,6 +37,9 @@ ALLOWED_USER_IDS = {int(x) for x in _csv("ALLOWED_USER_IDS")}
 # ---------- Anthropic (распознавание фото + разбор текста) ----------
 ANTHROPIC_API_KEY = (os.getenv("ANTHROPIC_API_KEY") or "").strip()
 ANTHROPIC_MODEL = os.getenv("ANTHROPIC_MODEL", "claude-haiku-4-5")
+# Фото читает модель посильнее: номер сушки на стене бывает двузначным и с тенью,
+# на этом младшая модель ошибалась. Вернуть как было: VISION_MODEL=claude-haiku-4-5
+VISION_MODEL = os.getenv("VISION_MODEL", "claude-sonnet-4-5")
 VISION_ENABLED = bool(ANTHROPIC_API_KEY) and os.getenv("VISION_ENABLED", "1") != "0"
 
 # Ассистент в личке: свободные вопросы по цеху. Модель посильнее — тут язык и логика,

@@ -305,6 +305,12 @@ async def _dryer_from_photo(msg: Message, bot: Bot, caption: str) -> tuple[int |
         data = buf.read() if buf else b""
         if 0 < len(data) <= MAX_PHOTO_BYTES:
             v = await parser.parse_with_vision(data, caption)
+            if v.dryer_number is None:
+                # не разглядели номер — спрашиваем ещё раз, но только про него
+                again = await parser.reread_dryer(data)
+                if again:
+                    log.info("номер сушки прочитан со второго раза: %s", again)
+                    return again, v.product or p.product
             return v.dryer_number, v.product or p.product
     except Exception as exc:  # noqa: BLE001
         log.warning("не смог прочитать фото загрузки: %s", exc)

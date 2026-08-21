@@ -539,7 +539,8 @@ async def parse_with_vision(image_bytes: bytes, caption: str, media_type: str = 
 
         client = AsyncAnthropic(api_key=config.ANTHROPIC_API_KEY)
         kwargs = dict(
-            model=config.ANTHROPIC_MODEL,
+            model=config.VISION_MODEL,
+            fallback_model=config.ANTHROPIC_MODEL,
             max_tokens=600,
             system=VISION_SYSTEM.format(max_dryer=config.DRYER_COUNT),
             messages=[{
@@ -565,6 +566,59 @@ async def parse_with_vision(image_bytes: bytes, caption: str, media_type: str = 
         return base
 
     return _merge(base, data)
+
+
+DRYER_ONLY_SYSTEM = """На фото — сушильная камера макаронной фабрики.
+На стене над щитком висит накладная золотистая цифра: это НОМЕР СУШКИ, от 1 до {max_dryer}.
+Он бывает однозначным и двузначным (10, 16, 23, 26, 31).
+
+Задача одна: назвать этот номер.
+• прочитай ВСЕ цифры таблички слева направо; две цифры рядом — одно число;
+• это НЕ цифры красного табло и НЕ надписи на щитке;
+• если табличка не попала в кадр, закрыта или не читается — ответь null.
+
+Ответ — строго JSON, без пояснений: {{"dryer_number_text": "<цифры или null>",
+"dryer_number_confidence": <0.0..1.0>}}"""
+
+
+async def reread_dryer(image_bytes: bytes, media_type: str = "image/jpeg") -> int | None:
+    """Второй заход: спрашиваем только номер сушки, ничего больше.
+
+    Первый разбор читает сразу всё — и иногда теряет первую цифру таблички.
+    Отдельный короткий вопрос про один номер работает заметно точнее.
+    """
+    if not config.VISION_ENABLED or not image_bytes:
+        return None
+    try:
+        from anthropic import AsyncAnthropic
+        from . import claude
+
+        client = AsyncAnthropic(api_key=config.ANTHROPIC_API_KEY)
+        resp = await claude.create(
+            client,
+            model=config.VISION_MODEL,
+            fallback_model=config.ANTHROPIC_MODEL,
+            max_tokens=100,
+            system=DRYER_ONLY_SYSTEM.format(max_dryer=config.DRYER_COUNT),
+            messages=[{"role": "user", "content": [
+                {"type": "image", "source": {
+                    "type": "base64", "media_type": media_type,
+                    "data": base64.standard_b64encode(image_bytes).decode()}},
+                {"type": "text", "text": "Nomer sushki?"},
+            ]}],
+        )
+        text = "".join(b.text for b in resp.content if getattr(b, "type", "") == "text").strip()
+        m = re.search(r"\{.*\}", text, re.S)
+        data = json.loads(m.group(0) if m else text)
+    except Exception as exc:  # noqa: BLE001
+        log.warning("повторное чтение номера не вышло: %s", exc)
+        return None
+
+    d = _digits(data.get("dryer_number_text"))
+    conf = float(data.get("dryer_number_confidence") or 0)
+    if d and len(d) <= 2 and 1 <= int(d) <= config.DRYER_COUNT and conf >= 0.5:
+        return int(d)
+    return None
 
 
 def _merge(base: Parsed, data: dict) -> Parsed:

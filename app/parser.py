@@ -581,11 +581,48 @@ DRYER_ONLY_SYSTEM = """На фото — сушильная камера мак�
 "dryer_number_confidence": <0.0..1.0>}}"""
 
 
+def plate_crop(image_bytes: bytes) -> bytes | None:
+    """Верх кадра, увеличенный и подчищенный: там висит табличка с номером.
+
+    Младшая модель теряет первую цифру двузначного номера, когда табличка мелкая.
+    Отдельный увеличенный кадр решает это дешевле, чем модель постарше.
+    """
+    try:
+        import io
+
+        from PIL import Image, ImageEnhance, ImageOps
+
+        im = ImageOps.exif_transpose(Image.open(io.BytesIO(image_bytes))).convert("RGB")
+        top = im.crop((0, 0, im.width, max(1, int(im.height * 0.55))))
+        k = 1100 / max(1, top.width)
+        if k > 1:
+            top = top.resize((int(top.width * k), int(top.height * k)), Image.LANCZOS)
+        top = ImageOps.autocontrast(top, cutoff=1)
+        top = ImageEnhance.Sharpness(top).enhance(1.7)
+        buf = io.BytesIO()
+        top.save(buf, "JPEG", quality=88, optimize=True)
+        return buf.getvalue()
+    except Exception as exc:  # noqa: BLE001  — Pillow может отсутствовать
+        log.warning("не смог подготовить верх кадра: %s", exc)
+        return None
+
+
+def agree(a: int | None, b: int | None) -> int | None:
+    """Два чтения одного и того же номера. Разошлись — значит, не знаем."""
+    if a and b:
+        if a == b:
+            return a
+        log.info("чтения номера разошлись: %s и %s — спрошу у цеха", a, b)
+        return None
+    return a or b
+
+
 async def reread_dryer(image_bytes: bytes, media_type: str = "image/jpeg") -> int | None:
     """Второй заход: спрашиваем только номер сушки, ничего больше.
 
     Первый разбор читает сразу всё — и иногда теряет первую цифру таблички.
-    Отдельный короткий вопрос про один номер работает заметно точнее.
+    Короткий вопрос про один номер, да ещё по увеличенному верху кадра,
+    работает заметно точнее — и на младшей модели тоже.
     """
     if not config.VISION_ENABLED or not image_bytes:
         return None
@@ -594,18 +631,25 @@ async def reread_dryer(image_bytes: bytes, media_type: str = "image/jpeg") -> in
         from . import claude
 
         client = AsyncAnthropic(api_key=config.ANTHROPIC_API_KEY)
+        content = [{"type": "image", "source": {
+            "type": "base64", "media_type": media_type,
+            "data": base64.standard_b64encode(image_bytes).decode()}}]
+        crop = plate_crop(image_bytes)
+        if crop:
+            content.append({"type": "image", "source": {
+                "type": "base64", "media_type": "image/jpeg",
+                "data": base64.standard_b64encode(crop).decode()}})
+            content.append({"type": "text", "text":
+                            "Второй кадр — увеличенный верх того же снимка, "
+                            "табличка там видна крупнее."})
+        content.append({"type": "text", "text": "Nomer sushki?"})
         resp = await claude.create(
             client,
             model=config.VISION_MODEL,
             fallback_model=config.ANTHROPIC_MODEL,
             max_tokens=100,
             system=DRYER_ONLY_SYSTEM.format(max_dryer=config.DRYER_COUNT),
-            messages=[{"role": "user", "content": [
-                {"type": "image", "source": {
-                    "type": "base64", "media_type": media_type,
-                    "data": base64.standard_b64encode(image_bytes).decode()}},
-                {"type": "text", "text": "Nomer sushki?"},
-            ]}],
+            messages=[{"role": "user", "content": content}],
         )
         text = "".join(b.text for b in resp.content if getattr(b, "type", "") == "text").strip()
         m = re.search(r"\{.*\}", text, re.S)

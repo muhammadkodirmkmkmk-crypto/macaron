@@ -305,13 +305,13 @@ async def _dryer_from_photo(msg: Message, bot: Bot, caption: str) -> tuple[int |
         data = buf.read() if buf else b""
         if 0 < len(data) <= MAX_PHOTO_BYTES:
             v = await parser.parse_with_vision(data, caption)
-            if v.dryer_number is None:
-                # не разглядели номер — спрашиваем ещё раз, но только про него
-                again = await parser.reread_dryer(data)
-                if again:
-                    log.info("номер сушки прочитан со второго раза: %s", again)
-                    return again, v.product or p.product
-            return v.dryer_number, v.product or p.product
+            # номер сушки читаем ВТОРОЙ раз отдельным вопросом и сверяем.
+            # Сошлись — верим; разошлись — считаем, что не знаем, и переспросим в группе.
+            again = await parser.reread_dryer(data)
+            dryer = parser.agree(v.dryer_number, again)
+            if dryer and dryer != v.dryer_number:
+                log.info("номер сушки уточнён по крупному кадру: %s", dryer)
+            return dryer, v.product or p.product
     except Exception as exc:  # noqa: BLE001
         log.warning("не смог прочитать фото загрузки: %s", exc)
     return p.dryer_number, p.product
@@ -477,7 +477,8 @@ def _open_hint(rows: list[LoadEvent], product: str | None) -> list[LoadEvent]:
     return (same or rows)[:8]
 
 
-def _ask_dryer_text(product: str | None, finished: dt.datetime, opened: list[LoadEvent]) -> str:
+def _ask_dryer_text(product: str | None, finished: dt.datetime,
+                    opened: list[LoadEvent], guess: int | None = None) -> str:
     """Спрашиваем номер сушки и показываем, что сейчас открыто."""
     fin_local = finished.replace(tzinfo=dt.timezone.utc).astimezone(config.TZ)
     lines = []
@@ -486,13 +487,16 @@ def _ask_dryer_text(product: str | None, finished: dt.datetime, opened: list[Loa
         head = f"№{e.dryer_number}" if e.dryer_number else "raqamsiz"
         lines.append(f"• <b>{head}</b> · {e.product or '—'} · {st:%H:%M} da kirgan")
     body = "\n".join(lines)
+    why = (f"Rasmda <b>№{guess}</b> deb o'qidim, lekin bunday ochiq sushka yo'q — "
+           f"aniqlashtiring." if guess else
+           "Rasmdagi raqamni aniq o'qiy olmadim, shuning uchun hech qayerga yozmadim.")
     return (
-        f"🤔 <b>Qaysi sushka?</b> Rasmdagi raqamni o'qiy olmadim, "
-        f"shuning uchun hech qayerga yozmadim.\n"
+        f"🤔 <b>Qaysi sushka?</b> {why}\n"
         f"Chiqqan vaqti: <b>{fin_local:%H:%M}</b>"
         f"{(' · ' + product) if product else ''}\n\n"
         f"Hozir ochiq turgan sushkalar:\n{body}\n\n"
-        f"Javob qilib faqat <b>raqam</b> yuboring — masalan <code>26</code>."
+        f"Javob qilib faqat <b>raqam</b> yuboring — masalan <code>26</code>.\n"
+        f"Agar raqam to'g'ri bo'lsa — boshlanish vaqtini yozing, masalan <code>21:11</code>."
     )
 
 
@@ -640,6 +644,9 @@ async def _handle_stop(msg: Message, bot: Bot, caption: str, has_photo: bool,
             duration, finished = _pair_minutes(ev.started_at, finished)
         # что вообще сейчас открыто — пригодится для вопроса «какая сушка?»
         open_hint = _open_hint(rows, product)
+        # номер прочитан, но такой сушки среди открытых нет — скорее всего, ошиблись
+        # при чтении: лучше переспросить, чем записать партию не туда
+        misread = bool(dryer) and ev is None and not any(e.dryer_number == dryer for e in rows)
 
         photo_id = msg.photo[-1].file_id if has_photo else None
         if ev is None or duration is None:
@@ -691,10 +698,10 @@ async def _handle_stop(msg: Message, bot: Bot, caption: str, has_photo: bool,
 
     if duration is None or ev is None:
         async with session() as s:
-            if dryer is None and open_hint:
-                # номер с фото не прочитался, а открытых заходов несколько —
-                # угадывать нельзя, спрашиваем номер у того, кто прислал
-                ask_text = _ask_dryer_text(product, finished, open_hint)
+            if (dryer is None or misread) and open_hint:
+                # номер с фото не прочитался (или прочитался, но такой сушки среди
+                # открытых нет) — угадывать нельзя, спрашиваем у того, кто прислал
+                ask_text = _ask_dryer_text(product, finished, open_hint, dryer)
             else:
                 ask_text = await _ask_start_text(s, dryer, product, finished)
         ask = await msg.reply(ask_text)

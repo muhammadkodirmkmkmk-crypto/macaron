@@ -345,6 +345,7 @@ async def _handle_load(msg: Message, bot: Bot, caption: str, has_photo: bool,
         )
         s.add(load)
         await s.flush()
+        load_id = load.id
         # выгрузка могла прийти раньше захода — тогда достраиваем партию сразу
         done = await _close_pending_stop(s, msg.chat.id, dryer, product, started)
         if done:
@@ -379,9 +380,18 @@ async def _handle_load(msg: Message, bot: Bot, caption: str, has_photo: bool,
             await msg.react([ReactionTypeEmoji(emoji="👌")])
         except Exception:  # noqa: BLE001
             pass
+    # номер не прочитался — спрашиваем сразу, пока заход свежий
+    if dryer is None and load_id:
+        ask = await msg.reply(
+            "🤔 <b>Qaysi sushka?</b> Rasmdagi raqamni o'qiy olmadim.\n"
+            f"Shu xabarga javob qilib <b>raqam</b> yuboring (1–{config.DRYER_COUNT})."
+        )
+        ASK_LOAD[(msg.chat.id, ask.message_id)] = load_id
 
 
 MAX_PAIR_MINUTES = 30 * 60   # дольше 30 часов — значит, заход не тот
+# «на какой заход мы переспросили номер» — живёт до перезапуска, ответ обычно приходит сразу
+ASK_LOAD: dict[tuple[int, int], int] = {}
 
 
 def _pick_load(rows: list[LoadEvent], dryer: int | None, product: str | None) -> LoadEvent | None:
@@ -394,20 +404,21 @@ def _pick_load(rows: list[LoadEvent], dryer: int | None, product: str | None) ->
         same = [e for e in rows if e.dryer_number == dryer]
         if same:
             return same[0]
-    if product:
-        # тот же продукт: первым выходит тот, кого раньше заложили
-        same = [e for e in rows
-                if (e.product or "").lower() == product.lower()
-                and (not dryer or e.dryer_number in (None, dryer))]
-        if same:
-            return same[-1]
-    # номер знаем, продукт нет: подходит заход без номера, но только если он один —
-    # иначе непонятно, чей он, и лучше спросить
-    if dryer:
+        # номер сушки знаем, но захода с таким номером нет: подходит только
+        # заход без номера и только если он один. Чужой заход не берём никогда —
+        # иначе партия запишется на соседнюю сушку.
         blank = [e for e in rows if e.dryer_number is None]
         if len(blank) == 1:
             return blank[0]
-    if not dryer and not product and len(rows) == 1:
+        return None
+    if product:
+        # номера нет. По продукту закрываем, только если такой заход ровно один:
+        # при нескольких открытых «zirak» угадывать нельзя — спросим номер.
+        same = [e for e in rows if (e.product or "").lower() == product.lower()]
+        if len(same) == 1:
+            return same[0]
+        return None
+    if len(rows) == 1:
         return rows[0]
     return None
 
@@ -454,6 +465,68 @@ def _pair_text(dryer, product, duration, started, finished) -> str:
     return text
 
 
+def _open_hint(rows: list[LoadEvent], product: str | None) -> list[LoadEvent]:
+    """Открытые заходы, которые оператор мог иметь в виду: сначала тот же продукт."""
+    same = [e for e in rows if product and (e.product or "").lower() == product.lower()]
+    return (same or rows)[:8]
+
+
+def _ask_dryer_text(product: str | None, finished: dt.datetime, opened: list[LoadEvent]) -> str:
+    """Спрашиваем номер сушки и показываем, что сейчас открыто."""
+    fin_local = finished.replace(tzinfo=dt.timezone.utc).astimezone(config.TZ)
+    lines = []
+    for e in opened:
+        st = e.started_at.replace(tzinfo=dt.timezone.utc).astimezone(config.TZ)
+        head = f"№{e.dryer_number}" if e.dryer_number else "raqamsiz"
+        lines.append(f"• <b>{head}</b> · {e.product or '—'} · {st:%H:%M} da kirgan")
+    body = "\n".join(lines)
+    return (
+        f"🤔 <b>Qaysi sushka?</b> Rasmdagi raqamni o'qiy olmadim, "
+        f"shuning uchun hech qayerga yozmadim.\n"
+        f"Chiqqan vaqti: <b>{fin_local:%H:%M}</b>"
+        f"{(' · ' + product) if product else ''}\n\n"
+        f"Hozir ochiq turgan sushkalar:\n{body}\n\n"
+        f"Javob qilib faqat <b>raqam</b> yuboring — masalan <code>26</code>."
+    )
+
+
+async def _pair_stop_with_dryer(s, pend: StopEvent, number: int):
+    """Оператор назвал номер сушки — закрываем этот заход и пишем партию."""
+    rows = (await s.execute(select(LoadEvent).where(
+        LoadEvent.closed == False,  # noqa: E712
+        LoadEvent.dryer_number == number,
+    ).order_by(LoadEvent.started_at.desc()).limit(20))).scalars().all()
+    rows = [e for e in rows if e.chat_id == pend.chat_id or not config.ALLOWED_CHAT_IDS]
+    ev = next((e for e in rows if e.started_at < pend.finished_at), None)
+    if ev is None:
+        return None
+    duration, finished = _pair_minutes(ev.started_at, pend.finished_at)
+    if duration is None:
+        return None
+    product = pend.product or ev.product
+    batch_id = await _save_pair(
+        s, chat_id=pend.chat_id, message_id=pend.message_id,
+        user_id=pend.user_id, user_name=pend.user_name,
+        dryer=number, product=product, started=ev.started_at, finished=finished,
+        duration=duration, raw_text=f"{ev.raw_text or ''} || {pend.raw_text or ''}".strip(" |"),
+        photo_file_id=pend.photo_file_id,
+    )
+    ev.closed = True
+    ev.closed_batch_id = batch_id
+    pend.dryer_number = number
+    pend.closed = True
+    pend.closed_batch_id = batch_id
+    raw = (await s.execute(select(RawMessage).where(
+        RawMessage.chat_id == pend.chat_id, RawMessage.message_id == pend.message_id
+    ))).scalar_one_or_none()
+    if raw:
+        raw.processed = True
+        raw.batch_id = batch_id
+        raw.parse_error = None
+    return {"batch_id": batch_id, "dryer": number, "product": product,
+            "duration": duration, "started": ev.started_at, "finished": finished}
+
+
 async def _ask_start_text(s, dryer, product, finished: dt.datetime) -> str:
     """Вопрос о времени начала — с зацепкой, от чего оператору плясать."""
     who = " · ".join(x for x in (f"№{dryer}" if dryer else None, product) if x)
@@ -494,15 +567,16 @@ async def _close_pending_stop(s, chat_id: int, dryer: int | None, product: str |
     pick = None
     if dryer:
         pick = next((x for x in rows if x.dryer_number == dryer), None)
-    if pick is None and product:
-        pick = next((x for x in rows
-                     if (x.product or "").lower() == product.lower()
-                     and (not dryer or x.dryer_number in (None, dryer))), None)
-    if pick is None and dryer:
-        blank = [x for x in rows if x.dryer_number is None]
-        if len(blank) == 1:
-            pick = blank[0]
-    if pick is None and not dryer and not product and len(rows) == 1:
+        if pick is None:
+            blank = [x for x in rows if x.dryer_number is None]
+            if len(blank) == 1:
+                pick = blank[0]
+    elif product:
+        # без номера — только если выгрузка этого продукта ровно одна
+        same = [x for x in rows if (x.product or "").lower() == product.lower()]
+        if len(same) == 1:
+            pick = same[0]
+    elif len(rows) == 1:
         pick = rows[0]
     if pick is None:
         return None
@@ -558,6 +632,8 @@ async def _handle_stop(msg: Message, bot: Bot, caption: str, has_photo: bool,
         duration = None
         if ev is not None:
             duration, finished = _pair_minutes(ev.started_at, finished)
+        # что вообще сейчас открыто — пригодится для вопроса «какая сушка?»
+        open_hint = _open_hint(rows, product)
 
         photo_id = msg.photo[-1].file_id if has_photo else None
         if ev is None or duration is None:
@@ -609,7 +685,12 @@ async def _handle_stop(msg: Message, bot: Bot, caption: str, has_photo: bool,
 
     if duration is None or ev is None:
         async with session() as s:
-            ask_text = await _ask_start_text(s, dryer, product, finished)
+            if dryer is None and open_hint:
+                # номер с фото не прочитался, а открытых заходов несколько —
+                # угадывать нельзя, спрашиваем номер у того, кто прислал
+                ask_text = _ask_dryer_text(product, finished, open_hint)
+            else:
+                ask_text = await _ask_start_text(s, dryer, product, finished)
         ask = await msg.reply(ask_text)
         async with session() as s:
             p = await s.get(StopEvent, pend_id)
@@ -621,6 +702,10 @@ async def _handle_stop(msg: Message, bot: Bot, caption: str, has_photo: bool,
 
     text = _pair_text(dryer, product, duration, started, finished)
     sent = await (msg.answer(text) if private else msg.reply(text))
+    # ответив числом на эту карточку, можно исправить номер сушки
+    async with session() as s:
+        s.add(Pending(chat_id=msg.chat.id, ask_message_id=sent.message_id, batch_id=batch_id))
+        await s.commit()
     if dryer is None:
         ask = await sent.reply(
             f"🤔 Qaysi sushka? Javob qilib <b>raqam</b> yuboring (1–{config.DRYER_COUNT})."
@@ -856,6 +941,61 @@ async def reply_with_number(msg: Message):
     number = int(msg.text.strip())
     if not (1 <= number <= config.DRYER_COUNT):
         return
+    ref = msg.reply_to_message.message_id
+
+    # 1) ответ на вопрос «Qaysi sushka?» по ЗАХОДУ (Start без номера)
+    async with session() as s:
+        load = None
+        lid = ASK_LOAD.get((msg.chat.id, ref))
+        if lid:
+            load = await s.get(LoadEvent, lid)
+        if load is None:
+            load = (await s.execute(select(LoadEvent).where(
+                LoadEvent.chat_id == msg.chat.id,
+                LoadEvent.message_id == ref,
+                LoadEvent.closed == False,  # noqa: E712
+            ).limit(1))).scalars().first()
+        if load is not None and load.dryer_number is None:
+            for old in (await s.execute(select(LoadEvent).where(
+                LoadEvent.closed == False,  # noqa: E712
+                LoadEvent.dryer_number == number,
+            ))).scalars().all():
+                if old.id != load.id:
+                    old.closed = True      # старый незакрытый заход этой сушки
+            load.dryer_number = number
+            await s.commit()
+            ASK_LOAD.pop((msg.chat.id, ref), None)
+            return await msg.reply(f"✅ Sushka №{number} — yozib oldim.")
+
+    # 2) ответ на вопрос «Qaysi sushka?» по выгрузке, которая ещё не записана
+    async with session() as s:
+        stop = (await s.execute(select(StopEvent).where(
+            StopEvent.chat_id == msg.chat.id,
+            StopEvent.closed == False,  # noqa: E712
+            (StopEvent.ask_message_id == ref) | (StopEvent.message_id == ref),
+        ).order_by(StopEvent.id.desc()).limit(1))).scalar_one_or_none()
+        done = None
+        if stop is not None:
+            done = await _pair_stop_with_dryer(s, stop, number)
+            if done is None:                      # заход этой сушки не найден
+                stop.dryer_number = number
+                ask_text = await _ask_start_text(s, number, stop.product, stop.finished_at)
+            await s.commit()
+    if stop is not None:
+        if done:
+            await msg.reply(_pair_text(done["dryer"], done["product"], done["duration"],
+                                       done["started"], done["finished"]))
+            log.info("номер ответом: сушка %s, %s, %s мин",
+                     done["dryer"], done["product"], done["duration"])
+        else:
+            ask = await msg.reply(ask_text)
+            async with session() as s:
+                p = await s.get(StopEvent, stop.id)
+                if p:
+                    p.ask_message_id = ask.message_id
+                    await s.commit()
+        return
+
     async with session() as s:
         pend = (await s.execute(
             select(Pending).where(

@@ -305,12 +305,13 @@ async def _dryer_from_photo(msg: Message, bot: Bot, caption: str) -> tuple[int |
         data = buf.read() if buf else b""
         if 0 < len(data) <= MAX_PHOTO_BYTES:
             v = await parser.parse_with_vision(data, caption)
-            # номер сушки читаем ВТОРОЙ раз отдельным вопросом и сверяем.
-            # Сошлись — верим; разошлись — считаем, что не знаем, и переспросим в группе.
+            # номер читаем ещё раз отдельным вопросом по крупному кадру — этот ответ
+            # точнее. Пустой ответ ничего не отменяет: пустой номер хуже любого.
             again = await parser.reread_dryer(data)
-            dryer = parser.agree(v.dryer_number, again)
-            if dryer and dryer != v.dryer_number:
-                log.info("номер сушки уточнён по крупному кадру: %s", dryer)
+            dryer = again or v.dryer_number
+            if again and v.dryer_number and again != v.dryer_number:
+                log.info("номер уточнён по крупному кадру: %s вместо %s",
+                         again, v.dryer_number)
             return dryer, v.product or p.product
     except Exception as exc:  # noqa: BLE001
         log.warning("не смог прочитать фото загрузки: %s", exc)
@@ -400,33 +401,46 @@ MAX_PAIR_MINUTES = 30 * 60   # дольше 30 часов — значит, за
 ASK_LOAD: dict[tuple[int, int], int] = {}
 
 
-def _pick_load(rows: list[LoadEvent], dryer: int | None, product: str | None) -> LoadEvent | None:
+def _pick_load(rows: list[LoadEvent], dryer: int | None,
+               product: str | None) -> tuple[LoadEvent | None, bool]:
     """Какой заход закрывает эта выгрузка. rows — открытые заходы, свежие первыми.
 
-    Номер сушки читается с фото и на заходе может не определиться, а на выгрузке
-    определиться (или наоборот) — поэтому одного совпадения по номеру мало.
+    Возвращает (заход, уверены ли). Не уверены — партию всё равно пишем,
+    но говорим об этом в ответе: одним числом её можно поправить.
     """
+    def oldest(items):
+        """Сушат по очереди: раньше заложили — раньше вышло."""
+        return min(items, key=lambda e: e.started_at) if items else None
+
+    def blanks(only_product: bool):
+        out = [e for e in rows if e.dryer_number is None]
+        if only_product and product:
+            out = [e for e in out if (e.product or "").lower() == product.lower()]
+        return out
+
     if dryer:
         same = [e for e in rows if e.dryer_number == dryer]
         if same:
-            return same[0]
-        # номер сушки знаем, но захода с таким номером нет: подходит только
-        # заход без номера и только если он один. Чужой заход не берём никогда —
-        # иначе партия запишется на соседнюю сушку.
-        blank = [e for e in rows if e.dryer_number is None]
-        if len(blank) == 1:
-            return blank[0]
-        return None
+            return same[0], True
+        # номер знаем, а захода с таким номером нет: скорее всего, при загрузке
+        # номер не прочитался. Берём самый старый безномерной заход того же товара —
+        # и заодно проставляем ему номер. Чужой пронумерованный заход не трогаем.
+        for cand in (blanks(True), blanks(False)):
+            if len(cand) == 1:
+                return cand[0], True
+            if cand:
+                return oldest(cand), False
+        return None, False
+
     if product:
-        # номера нет. По продукту закрываем, только если такой заход ровно один:
-        # при нескольких открытых «zirak» угадывать нельзя — спросим номер.
         same = [e for e in rows if (e.product or "").lower() == product.lower()]
         if len(same) == 1:
-            return same[0]
-        return None
+            return same[0], True
+        if same:
+            return oldest(same), False
     if len(rows) == 1:
-        return rows[0]
-    return None
+        return rows[0], True
+    return None, False
 
 
 def _pair_minutes(started: dt.datetime, finished: dt.datetime):
@@ -578,14 +592,12 @@ async def _close_pending_stop(s, chat_id: int, dryer: int | None, product: str |
     if dryer:
         pick = next((x for x in rows if x.dryer_number == dryer), None)
         if pick is None:
-            blank = [x for x in rows if x.dryer_number is None]
-            if len(blank) == 1:
-                pick = blank[0]
+            blank = [x for x in rows if x.dryer_number is None
+                     and (not product or (x.product or "").lower() == product.lower())]
+            if blank:
+                pick = blank[0]        # самая ранняя выгрузка после этого захода
     elif product:
-        # без номера — только если выгрузка этого продукта ровно одна
-        same = [x for x in rows if (x.product or "").lower() == product.lower()]
-        if len(same) == 1:
-            pick = same[0]
+        pick = next((x for x in rows if (x.product or "").lower() == product.lower()), None)
     elif len(rows) == 1:
         pick = rows[0]
     if pick is None:
@@ -638,15 +650,12 @@ async def _handle_stop(msg: Message, bot: Bot, caption: str, has_photo: bool,
             LoadEvent.closed == False  # noqa: E712
         ).order_by(LoadEvent.started_at.desc()).limit(120))).scalars().all()
         rows = [e for e in rows if e.chat_id == msg.chat.id or private or not config.ALLOWED_CHAT_IDS]
-        ev = _pick_load(rows, dryer, product)
+        ev, sure = _pick_load(rows, dryer, product)
         duration = None
         if ev is not None:
             duration, finished = _pair_minutes(ev.started_at, finished)
         # что вообще сейчас открыто — пригодится для вопроса «какая сушка?»
         open_hint = _open_hint(rows, product)
-        # номер прочитан, но такой сушки среди открытых нет — скорее всего, ошиблись
-        # при чтении: лучше переспросить, чем записать партию не туда
-        misread = bool(dryer) and ev is None and not any(e.dryer_number == dryer for e in rows)
 
         photo_id = msg.photo[-1].file_id if has_photo else None
         if ev is None or duration is None:
@@ -698,9 +707,8 @@ async def _handle_stop(msg: Message, bot: Bot, caption: str, has_photo: bool,
 
     if duration is None or ev is None:
         async with session() as s:
-            if (dryer is None or misread) and open_hint:
-                # номер с фото не прочитался (или прочитался, но такой сушки среди
-                # открытых нет) — угадывать нельзя, спрашиваем у того, кто прислал
+            if dryer is None and open_hint:
+                # закрывать нечего, а открытые заходы есть — спрашиваем номер
                 ask_text = _ask_dryer_text(product, finished, open_hint, dryer)
             else:
                 ask_text = await _ask_start_text(s, dryer, product, finished)
@@ -714,6 +722,10 @@ async def _handle_stop(msg: Message, bot: Bot, caption: str, has_photo: bool,
         return True
 
     text = _pair_text(dryer, product, duration, started, finished)
+    if not sure and dryer:
+        # заход подобрали по очереди, а не по номеру — пишем, но честно предупреждаем
+        text += ("\n📝 Rasmdagi raqamga qarab emas, navbat bo'yicha juftladim. "
+                 "Boshqa sushka bo'lsa — javob qilib raqam yuboring.")
     sent = await (msg.answer(text) if private else msg.reply(text))
     # ответив числом на эту карточку, можно исправить номер сушки
     async with session() as s:

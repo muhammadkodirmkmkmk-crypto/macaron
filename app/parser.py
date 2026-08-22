@@ -56,6 +56,8 @@ OUT_WORDS_RE = re.compile(
 # Новый формат цеха: «Start vaqt 23:26 qochqor» / «Stop vaqt 22:46 burama»
 START_STOP_RE = re.compile(r"(?:\bstart\b|\bstop\b|\bстарт\w*|\bстоп\w*)", re.I | re.U)
 BARE_NUM_RE = re.compile(r"(?<![\d:.\-])(\d{1,2})(?![\d:.\-])")
+# номер первым словом: «29 Stop pero», «№8 stop qochqor», «17-burama chiqdi»
+LEAD_NUM_RE = re.compile(r"^\s*[№#]?\s*(\d{1,2})(?![\d:.])\s*[-–—]?\s*(?=\S)")
 UNIT_AFTER_RE = re.compile(r"\s*(?:soat|soa|min|daq|час|ч\b|мин)", re.I | re.U)
 
 
@@ -176,6 +178,16 @@ def dryer_hint(text: str) -> int | None:
     if m:
         n = int(m.group(1))
         if 1 <= n <= config.DRYER_COUNT:
+            return n
+    # «29 Stop pero», «17 burama chiqdi» — в цехе привыкли ставить номер первым словом
+    m = LEAD_NUM_RE.match(text)
+    if m and not UNIT_AFTER_RE.match(text[m.end(1):m.end(1) + 8]):
+        n = int(m.group(1))
+        rest = text[m.end(1):]
+        looks_like_report = bool(
+            _match_product(rest) or IN_WORDS_RE.search(rest) or OUT_WORDS_RE.search(rest)
+            or START_STOP_RE.search(rest))
+        if 1 <= n <= config.DRYER_COUNT and looks_like_report:
             return n
     if not START_STOP_RE.search(text):
         return None

@@ -164,11 +164,21 @@ def parse_stop_only(text: str) -> tuple[int, int] | None:
     return times[0][0], times[0][1]
 
 
+# в узбекском апостроф пишут по-разному: Oʻng, O'ng, O‘ng, O`ng — это одна буква
+APOS_RE = re.compile("[\u02bb\u02bc\u2018\u2019\u201b\u0060\u00b4\u2032]")
+
+
+def norm(text: str) -> str:
+    """Приводим все виды апострофа к одному — иначе «Oʻng» не совпадает с «o'ng»."""
+    return APOS_RE.sub("'", text or "")
+
+
 def dryer_hint(text: str) -> int | None:
     """Номер сушки из текста: «12-sushka», «№12», а в формате Start/Stop —
     любое отдельно стоящее число (часы туда не попадают, единицы времени отсекаем)."""
     if not text:
         return None
+    text = norm(text)
     m = DRYER_BEFORE_RE.search(text)          # «12 sushka» — номер стоит первым
     if m:
         n = int(m.group(1))
@@ -284,7 +294,7 @@ def _levenshtein(a: str, b: str) -> int:
 
 
 def _match_product(text: str) -> str | None:
-    low = text.lower()
+    low = norm(text).lower()
     # 1) Точное вхождение известного слова (по границам)
     best = None
     best_pos = 10**9
@@ -361,7 +371,7 @@ def parse_text(text: str) -> Parsed:
     p = Parsed(source="regex")
     if not text:
         return p
-    clean = text.strip()
+    clean = norm(text).strip()
 
     p.product = _match_product(clean)
     p.quality = _quality_from_text(clean)

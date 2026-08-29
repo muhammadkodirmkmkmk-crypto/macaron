@@ -12,6 +12,7 @@ from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from . import config
+from .parser import norm
 from .db import MotorFault
 
 MOTORS_PER_SIDE = 3          # 3 слева + 3 справа = 6 на аппарат
@@ -69,7 +70,7 @@ def parse_fixed(text: str) -> dict | None:
 
     None — если про починку речи нет.
     """
-    t = (text or "").strip()
+    t = norm(text).strip()
     if not t or not FIXED_RE.search(t):
         return None
     low = t.lower()
@@ -105,7 +106,7 @@ def parse(text: str) -> dict | None:
 
     Возвращает None, если это не про мотор — обычную переписку не трогаем.
     """
-    t = (text or "").strip()
+    t = norm(text).strip()
     if not t or not MOTOR_RE.search(t):
         return None
     if not BREAK_RE.search(t):

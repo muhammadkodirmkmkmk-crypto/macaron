@@ -174,6 +174,27 @@ class MotorFault(Base):
 Index("ix_motor_faults_place", MotorFault.dryer, MotorFault.side, MotorFault.motor)
 
 
+class MotorEvent(Base):
+    """Лента «сломался → починили»: каждое сообщение из группы отдельной строкой.
+
+    Отдельная таблица, а не новые колонки в motor_faults: create_all добавляет
+    только новые таблицы, а существующую в рабочей базе не трогает.
+    """
+
+    __tablename__ = "motor_events"
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True)
+    fault_id: Mapped[int] = mapped_column(Integer, index=True)
+    kind: Mapped[str] = mapped_column(String(10), index=True)        # break | fix | reopen
+    at: Mapped[dt.datetime] = mapped_column(DateTime, index=True)
+    who: Mapped[str | None] = mapped_column(String(128))
+    text: Mapped[str | None] = mapped_column(Text)                   # как написали в группе
+    source: Mapped[str] = mapped_column(String(16), default="telegram")  # telegram|web|dashboard|backfill
+    chat_id: Mapped[int | None] = mapped_column(BigInteger)
+    message_id: Mapped[int | None] = mapped_column(BigInteger)
+    created_at: Mapped[dt.datetime] = mapped_column(DateTime, default=utcnow)
+
+
 class DryerMeta(Base):
     """Необязательные подписи сушек (цех, бригада)."""
 

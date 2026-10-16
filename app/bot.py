@@ -184,11 +184,14 @@ async def cmd_faults(msg: Message):
                      "\n\nTuzatilgach: <code>/tuzatildi 12</code>")
 
 
-async def _close_fault(s, f: MotorFault, who: str) -> str:
-    f.status = "fixed"
-    f.fixed_at = motors.utcnow()
-    f.fixed_by = who
-    h = (f.fixed_at - f.reported_at).total_seconds() / 3600
+async def _close_fault(s, f: MotorFault, who: str, msg: Message | None = None) -> str:
+    """Закрываем поломку и кладём в историю то сообщение, которым её закрыли."""
+    h = await motors.close(
+        s, f, who=who, source="telegram",
+        text=(msg.text or msg.caption) if msg else None,
+        chat_id=msg.chat.id if msg else None,
+        message_id=msg.message_id if msg else None,
+        when=_sent_at(msg) if msg else None)
     when = f"{h:.1f} soat" if h < 48 else f"{h/24:.1f} kun"
     return f"#{f.id} {motors.title(f.dryer, f.side, f.motor)} — {when}"
 
@@ -241,7 +244,7 @@ async def _try_fixed(msg: Message, text: str) -> bool:
             await s.commit()
             await msg.reply("Bunday ochiq nosozlik topilmadi. Ro'yxat: /nosozlik")
             return True
-        line = await _close_fault(s, f, _uname(msg))
+        line = await _close_fault(s, f, _uname(msg), msg)
         await s.commit()
     await msg.reply(f"✅ Tuzatildi: {line}")
     return True
@@ -268,7 +271,7 @@ async def cmd_fault_fix(msg: Message):
             f = await s.get(MotorFault, n)
             if not f or f.status == "fixed":
                 continue
-            done.append(await _close_fault(s, f, _uname(msg)))
+            done.append(await _close_fault(s, f, _uname(msg), msg))
         await s.commit()
     await msg.answer(("✅ Tuzatildi:\n" + "\n".join(done)) if done
                      else "Bunday ochiq nosozlik topilmadi. Ro'yxat: /nosozlik")

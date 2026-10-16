@@ -192,11 +192,10 @@ button:active{opacity:.85}
             if "status" in payload:
                 st = payload["status"]
                 if st == "fixed" and row.status != "fixed":
-                    row.status = "fixed"
-                    row.fixed_at = motors.utcnow()
-                    row.fixed_by = (payload.get("fixed_by") or "Dashboard")[:128]
-                elif st == "open":
-                    row.status, row.fixed_at, row.fixed_by = "open", None, None
+                    await motors.close(s, row, who=payload.get("fixed_by") or "Dashboard",
+                                       text=payload.get("note"), source="dashboard")
+                elif st == "open" and row.status != "open":
+                    await motors.reopen(s, row, who=payload.get("by"))
             if payload.get("cost") is not None:
                 row.cost = max(0, int(payload.get("cost") or 0))
             if payload.get("text"):

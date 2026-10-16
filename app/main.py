@@ -41,6 +41,17 @@ async def run_bot() -> None:
 
 async def main() -> None:
     await init_db()
+    # история поломок: старые записи раньше ленты событий — достраиваем один раз
+    from . import motors
+    from .db import session
+    try:
+        async with session() as s:
+            n = await motors.backfill_events(s)
+            await s.commit()
+        if n:
+            log.info("история моторов: добавлено %s старых событий", n)
+    except Exception as e:                       # история не должна ронять запуск
+        log.warning("история моторов: не удалось достроить — %s", e)
     log.info("БД готова: %s", config.DATABASE_URL.split("@")[-1])
     log.info("Vision: %s (%s)", "включён" if config.VISION_ENABLED else "выключен", config.ANTHROPIC_MODEL)
     await asyncio.gather(run_web(), run_bot())

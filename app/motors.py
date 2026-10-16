@@ -13,7 +13,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from . import config
 from .parser import norm
-from .db import MotorFault
+from .db import MotorEvent, MotorFault
 
 MOTORS_PER_SIDE = 3          # 3 слева + 3 справа = 6 на аппарат
 SIDES = ("chap", "ong")      # chap — слева, ong — справа
@@ -29,7 +29,7 @@ DRYER_RE = re.compile(r"(?:sushka\w*|sushk|сушк\w*|apparat\w*|аппарат
 # слева
 LEFT_RE = re.compile(r"(?:chap\w*|чап\w*|left|слев\w*|лев\w*)", re.I | re.U)
 # справа
-RIGHT_RE = re.compile(r"(?:o['`’]?ng\w*|ung\w*|ong\w*|ўнг\w*|унг\w*|онг\w*|right|справ\w*|прав\w*)",
+RIGHT_RE = re.compile(r"(?:[oóòö]['`’]?ng\w*|ung\w*|ong\w*|ўнг\w*|унг\w*|онг\w*|right|справ\w*|прав\w*)",
                       re.I | re.U)
 # поломка: без этих слов сообщение о моторе — просто разговор
 BREAK_RE = re.compile(
@@ -192,7 +192,52 @@ async def add(s: AsyncSession, *, dryer, side, motor, text, who=None,
                      reported_at=when or utcnow())
     s.add(row)
     await s.flush()
+    s.add(MotorEvent(fault_id=row.id, kind="break", at=row.reported_at, who=who,
+                     text=(text or "")[:500], source=source, chat_id=chat_id,
+                     message_id=message_id))
     return row
+
+
+async def close(s: AsyncSession, f: MotorFault, *, who: str | None, text: str | None = None,
+                source: str = "telegram", chat_id=None, message_id=None, when=None) -> float:
+    """Мотор вернули в строй. Возвращает, сколько часов он простоял."""
+    f.status = "fixed"
+    f.fixed_at = when or utcnow()
+    f.fixed_by = (who or "—")[:128]
+    s.add(MotorEvent(fault_id=f.id, kind="fix", at=f.fixed_at, who=f.fixed_by,
+                     text=(text or "")[:500] or None, source=source, chat_id=chat_id,
+                     message_id=message_id))
+    return _hours(f.reported_at, f.fixed_at)
+
+
+async def reopen(s: AsyncSession, f: MotorFault, *, who: str | None = None) -> None:
+    """«Починено» нажали по ошибке — запись снова открыта, и это тоже видно в истории."""
+    f.status, f.fixed_at, f.fixed_by = "open", None, None
+    s.add(MotorEvent(fault_id=f.id, kind="reopen", at=utcnow(), who=who or "Dashboard",
+                     source="dashboard"))
+
+
+async def backfill_events(s: AsyncSession) -> int:
+    """Старые поломки появились раньше ленты событий — достраиваем её один раз.
+
+    Текст сообщения о починке тогда не сохраняли, поэтому у таких «починок»
+    будет только кто и когда. Пишем лишь в новую таблицу, motor_faults не трогаем.
+    """
+    have = set((await s.execute(select(MotorEvent.fault_id).distinct())).scalars().all())
+    rows = (await s.execute(select(MotorFault))).scalars().all()
+    n = 0
+    for f in rows:
+        if f.id in have:
+            continue
+        s.add(MotorEvent(fault_id=f.id, kind="break", at=f.reported_at, who=f.who,
+                         text=f.text, source="backfill", chat_id=f.chat_id,
+                         message_id=f.message_id))
+        n += 1
+        if f.status == "fixed" and f.fixed_at:
+            s.add(MotorEvent(fault_id=f.id, kind="fix", at=f.fixed_at, who=f.fixed_by,
+                             text=None, source="backfill"))
+            n += 1
+    return n
 
 
 async def open_rows(s: AsyncSession) -> list[MotorFault]:
@@ -201,11 +246,28 @@ async def open_rows(s: AsyncSession) -> list[MotorFault]:
     )).scalars().all())
 
 
+def place(f: MotorFault) -> tuple[int | None, str | None, int | None]:
+    """Где сломалось: сушка, сторона, мотор.
+
+    Первые записи разбирались хуже — «Oʻng», «óng» бот тогда не узнавал, и сторона
+    осталась пустой. Дочитываем её из текста сообщения, если сушка та же.
+    В базе ничего не меняем — только для показа и подсчёта.
+    """
+    d, sd, m = f.dryer, f.side, f.motor
+    if (sd is None or m is None) and f.text:
+        hit = parse(f.text)
+        if hit and hit["dryer"] in (None, d):
+            sd = sd or hit["side"]
+            m = m or hit["motor"]
+    return d, sd, m
+
+
 def serialize(f: MotorFault) -> dict:
     rep, fx = to_local(f.reported_at), to_local(f.fixed_at)
+    d, sd, m = place(f)
     return {
-        "id": f.id, "dryer": f.dryer, "side": f.side, "motor": f.motor,
-        "name": title(f.dryer, f.side, f.motor),
+        "id": f.id, "dryer": d, "side": sd, "motor": m,
+        "name": title(d, sd, m),
         "text": f.text or "", "who": f.who or "—", "fixed_by": f.fixed_by or "",
         "status": f.status,
         "reported_at": rep.isoformat() if rep else None,
@@ -220,8 +282,100 @@ def slot(side: str | None, motor: int | None) -> str:
     return f"{side or '?'}{motor or '?'}"
 
 
+def _down(f: MotorFault, now: dt.datetime) -> float:
+    """Сколько часов мотор не работал: до починки или, если ещё открыт, до сейчас."""
+    return _hours(f.reported_at, f.fixed_at or now)
+
+
+REPEAT_DAYS = 7     # сломался снова в течение недели после ремонта — ремонт был плохой
+
+
+def motor_rank(rows: list[MotorFault], since: dt.datetime, now: dt.datetime) -> list[dict]:
+    """Каждый конкретный мотор: «13-сушка · справа · 2-мотор» — сколько раз, как часто, сколько простоял."""
+    by: dict[tuple, list[MotorFault]] = {}
+    for f in rows:
+        d, sd, m = place(f)
+        if not d or not sd or not m:
+            continue                     # непонятно, какой именно мотор, — в рейтинг не берём
+        by.setdefault((d, sd, m), []).append(f)
+    out = []
+    for (d, sd, m), fs in by.items():
+        fs.sort(key=lambda f: f.reported_at)
+        gaps = [(b.reported_at - a.reported_at).total_seconds() / 86400 for a, b in zip(fs, fs[1:])]
+        repeat = 0
+        for a, b in zip(fs, fs[1:]):
+            # раньше починки — это тот же случай, написанный второй раз, а не новая поломка
+            if a.fixed_at and 0 <= (b.reported_at - a.fixed_at).total_seconds() <= REPEAT_DAYS * 86400:
+                repeat += 1
+        done = [f for f in fs if f.fixed_at]
+        last = to_local(fs[-1].reported_at)
+        out.append({
+            "dryer": d, "side": sd, "motor": m, "name": title(d, sd, m),
+            "count": len(fs),
+            "period": len([f for f in fs if f.reported_at >= since]),
+            "open": len([f for f in fs if f.status == "open"]),
+            "down_hours": round(sum(_down(f, now) for f in fs), 1),
+            "avg_repair": round(sum(_hours(f.reported_at, f.fixed_at) for f in done) / len(done), 1)
+            if done else None,
+            "every_days": round(sum(gaps) / len(gaps), 1) if gaps else None,
+            "repeat": repeat,
+            "last": last.isoformat() if last else None,
+            "ids": [f.id for f in fs],
+        })
+    out.sort(key=lambda x: (-x["count"], -(x["down_hours"] or 0), x["dryer"]))
+    return out
+
+
+def people(rows: list[MotorFault]) -> list[dict]:
+    """Кто пишет о поломках и кто чинит — и как быстро."""
+    acc: dict[str, dict] = {}
+    for f in rows:
+        if f.who:
+            a = acc.setdefault(f.who, {"name": f.who, "reported": 0, "fixed": 0, "hours": 0.0})
+            a["reported"] += 1
+        if f.status == "fixed" and f.fixed_by and f.fixed_at:
+            a = acc.setdefault(f.fixed_by, {"name": f.fixed_by, "reported": 0, "fixed": 0, "hours": 0.0})
+            a["fixed"] += 1
+            a["hours"] += _hours(f.reported_at, f.fixed_at)
+    out = []
+    for a in acc.values():
+        a["avg_fix"] = round(a["hours"] / a["fixed"], 1) if a["fixed"] else None
+        a.pop("hours")
+        out.append(a)
+    out.sort(key=lambda x: (-(x["fixed"] + x["reported"]), x["name"]))
+    return out
+
+
+async def history(s: AsyncSession, faults: dict[int, MotorFault], limit: int = 600) -> list[dict]:
+    """Лента событий из группы, новые сверху: сломался / починили / открыли снова."""
+    evs = (await s.execute(
+        select(MotorEvent).order_by(MotorEvent.at.desc(), MotorEvent.id.desc()).limit(limit)
+    )).scalars().all()
+    out = []
+    for e in evs:
+        f = faults.get(e.fault_id)
+        if not f:
+            continue                     # запись о поломке удалили — событие не показываем
+        d, sd, m = place(f)
+        at = to_local(e.at)
+        item = {
+            "id": e.id, "fault_id": e.fault_id, "kind": e.kind,
+            "at": at.isoformat() if at else None,
+            "who": e.who or "—", "text": e.text or "", "source": e.source,
+            "dryer": d, "side": sd, "motor": m, "name": title(d, sd, m),
+            "status": f.status,
+        }
+        if e.kind == "fix" and f.fixed_at:
+            item["hours"] = round(_hours(f.reported_at, e.at), 1)
+        if e.kind == "break" and f.status == "open":
+            item["open_hours"] = round(_hours(f.reported_at, utcnow()), 1)
+        out.append(item)
+    return out
+
+
 async def payload(s: AsyncSession, days: int = 30) -> dict:
-    since = utcnow() - dt.timedelta(days=days)
+    now = utcnow()
+    since = now - dt.timedelta(days=days)
     rows = list((await s.execute(
         select(MotorFault).order_by(MotorFault.reported_at.desc()).limit(3000)
     )).scalars().all())
@@ -232,29 +386,31 @@ async def payload(s: AsyncSession, days: int = 30) -> dict:
 
     by_dryer: dict[int, dict] = {}
     for f in period:
-        if not f.dryer:
+        d, sd, m = place(f)
+        if not d:
             continue
-        d = by_dryer.setdefault(f.dryer, {"dryer": f.dryer, "count": 0, "open": 0,
-                                          "hours": 0.0, "done": 0, "slots": {}})
-        d["count"] += 1
-        d["slots"][slot(f.side, f.motor)] = d["slots"].get(slot(f.side, f.motor), 0) + 1
+        x = by_dryer.setdefault(d, {"dryer": d, "count": 0, "open": 0,
+                                    "hours": 0.0, "done": 0, "slots": {}})
+        x["count"] += 1
+        x["slots"][slot(sd, m)] = x["slots"].get(slot(sd, m), 0) + 1
         if f.status == "open":
-            d["open"] += 1
+            x["open"] += 1
         elif f.fixed_at:
-            d["done"] += 1
-            d["hours"] += _hours(f.reported_at, f.fixed_at)
+            x["done"] += 1
+            x["hours"] += _hours(f.reported_at, f.fixed_at)
     dryers = sorted(by_dryer.values(), key=lambda x: (-x["count"], x["dryer"]))
     for x in dryers:
         x["avg_hours"] = round(x["hours"] / x["done"], 1) if x["done"] else None
         x.pop("hours")
 
-    # какое место чаще горит: слева-1 … справа-3
+    # какое место чаще горит: слева-1 … справа-3 — за период и за всё время
     slots = []
     for sd in SIDES:
         for i in range(1, MOTORS_PER_SIDE + 1):
-            n = len([f for f in period if f.side == sd and f.motor == i])
-            slots.append({"side": sd, "motor": i, "key": f"{sd}{i}", "count": n})
-    unknown = len([f for f in period if not f.side or not f.motor])
+            n = len([f for f in period if place(f)[1:] == (sd, i)])
+            n_all = len([f for f in rows if place(f)[1:] == (sd, i)])
+            slots.append({"side": sd, "motor": i, "key": f"{sd}{i}", "count": n, "all": n_all})
+    unknown = len([f for f in period if None in place(f)[1:]])
 
     by_day: dict[str, int] = {}
     for f in period:
@@ -263,19 +419,27 @@ async def payload(s: AsyncSession, days: int = 30) -> dict:
             k = d.date().isoformat()
             by_day[k] = by_day.get(k, 0) + 1
 
+    first = to_local(rows[-1].reported_at) if rows else None
     return {
         "kpi": {
             "open": len(op), "period": len(period), "fixed": len(done), "avg_hours": avg,
             "cost": sum(int(f.cost or 0) for f in period),
             "dryers": len(by_dryer),
-            "oldest_hours": round(max((_hours(f.reported_at, utcnow()) for f in op), default=0), 1),
+            "oldest_hours": round(max((_hours(f.reported_at, now) for f in op), default=0), 1),
+            "all": len(rows),
+            "down_hours": round(sum(_down(f, now) for f in period), 1),
         },
+        "since": first.isoformat() if first else None,
         "dryers": dryers,
         "slots": slots,
         "unknown": unknown,
         "days": [{"day": k, "count": v} for k, v in sorted(by_day.items())],
         "open": [serialize(f) for f in op[:40]],
         "recent": [serialize(f) for f in period[:150]],
+        "motors": motor_rank(rows, since, now),
+        "people": people(rows),
+        "history": await history(s, {f.id: f for f in rows}),
+        "repeat_days": REPEAT_DAYS,
         "per_side": MOTORS_PER_SIDE,
         "dryer_count": config.DRYER_COUNT,
     }
